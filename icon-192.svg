@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
+  <rect width="192" height="192" rx="28" fill="#1a5c2e"/>
+  <rect width="192" height="192" rx="28" fill="url(#g)"/>
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2e7d4f" stop-opacity="0.6"/>
+      <stop offset="1" stop-color="#0a1f12" stop-opacity="0.6"/>
+    </linearGradient>
+  </defs>
+  <!-- Pitch centre circle suggestion -->
+  <circle cx="96" cy="86" r="36" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="4"/>
+  <line x1="96" y1="50" x2="96" y2="122" stroke="rgba(255,255,255,0.18)" stroke-width="4"/>
+  <!-- R6 wordmark -->
+  <text x="96" y="148" font-family="Arial Black, Arial, sans-serif" font-size="60" font-weight="900"
+        fill="white" text-anchor="middle" letter-spacing="-2">R6</text>
+</svg>

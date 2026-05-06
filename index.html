@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>RefSix</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1a5c2e">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="RefSix">
+  <link rel="apple-touch-icon" href="icon-192.svg">
+  <link rel="icon" href="icon-192.svg">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════
+     VIEW: SETUP
+════════════════════════════════════════════ -->
+<div id="view-setup" class="view active">
+  <header class="setup-header">
+    <div class="logo-mark">R6</div>
+    <h1 class="app-title">RefSix</h1>
+    <p class="app-subtitle">Match Management</p>
+  </header>
+
+  <main class="setup-main">
+    <div class="form-card">
+      <div class="form-group">
+        <label for="inp-competition">Competition <span class="optional">(optional)</span></label>
+        <input id="inp-competition" type="text" placeholder="e.g. Premier League U18" autocomplete="off">
+      </div>
+
+      <div class="teams-row">
+        <div class="form-group flex-1">
+          <label for="inp-home">Home Team</label>
+          <input id="inp-home" type="text" placeholder="Home" autocomplete="off" value="Home">
+        </div>
+        <div class="vs-badge">VS</div>
+        <div class="form-group flex-1">
+          <label for="inp-away">Away Team</label>
+          <input id="inp-away" type="text" placeholder="Away" autocomplete="off" value="Away">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="inp-half-length">
+          Half Length &nbsp;<strong id="half-length-val">45</strong> min
+        </label>
+        <input id="inp-half-length" type="range" min="1" max="90" value="45" step="1">
+        <div class="range-hints"><span>1</span><span>45</span><span>90</span></div>
+      </div>
+
+      <div class="form-group toggle-row">
+        <label for="inp-sinbin-enabled">Sin Bin</label>
+        <label class="toggle">
+          <input id="inp-sinbin-enabled" type="checkbox">
+          <span class="toggle-track"><span class="toggle-thumb"></span></span>
+        </label>
+      </div>
+
+      <div id="sinbin-duration-group" class="form-group hidden">
+        <label for="inp-sinbin-duration">
+          Sin Bin Duration &nbsp;<strong id="sinbin-duration-val">10</strong> min
+        </label>
+        <input id="inp-sinbin-duration" type="range" min="3" max="15" value="10" step="1">
+        <div class="range-hints"><span>3</span><span>10</span><span>15</span></div>
+      </div>
+    </div>
+
+    <button id="btn-kickoff" class="btn-primary btn-kickoff">
+      <span class="kickoff-icon">&#9654;</span> KICK OFF
+    </button>
+  </main>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     VIEW: MATCH
+════════════════════════════════════════════ -->
+<div id="view-match" class="view">
+
+  <div class="match-top">
+    <div class="match-meta">
+      <span id="match-competition-label" class="competition-label"></span>
+      <span id="match-half-label" class="half-label">1st Half</span>
+    </div>
+
+    <div class="timer-block">
+      <div class="timer-display">
+        <span id="timer-main">00:00</span>
+        <span id="timer-at" class="timer-at hidden">AT</span>
+      </div>
+      <div id="timer-extra" class="timer-extra hidden"></div>
+    </div>
+
+    <div class="scoreboard">
+      <div class="sb-team home">
+        <span id="sb-home-name" class="sb-name">Home</span>
+        <span id="sb-home-score" class="sb-score">0</span>
+      </div>
+      <div class="sb-sep">–</div>
+      <div class="sb-team away">
+        <span id="sb-away-score" class="sb-score">0</span>
+        <span id="sb-away-name" class="sb-name">Away</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sin bins -->
+  <div id="sinbin-area" class="sinbin-area hidden">
+    <div class="sinbin-header">SIN BINS</div>
+    <div id="sinbin-list" class="sinbin-list"></div>
+  </div>
+
+  <!-- Recent events -->
+  <div id="event-feed" class="event-feed"></div>
+
+  <!-- Action buttons -->
+  <div class="action-grid" id="action-grid">
+    <button class="action-btn btn-goal" data-action="goal" data-team="home">
+      <span class="action-icon">&#9917;</span>
+      <span class="action-label">GOAL</span>
+      <span class="action-team" id="ag-goal-home">Home</span>
+    </button>
+    <button class="action-btn btn-goal" data-action="goal" data-team="away">
+      <span class="action-icon">&#9917;</span>
+      <span class="action-label">GOAL</span>
+      <span class="action-team" id="ag-goal-away">Away</span>
+    </button>
+
+    <button class="action-btn btn-yellow" data-action="yellow" data-team="home">
+      <span class="card-icon yc"></span>
+      <span class="action-label">YELLOW</span>
+      <span class="action-team" id="ag-yc-home">Home</span>
+    </button>
+    <button class="action-btn btn-yellow" data-action="yellow" data-team="away">
+      <span class="card-icon yc"></span>
+      <span class="action-label">YELLOW</span>
+      <span class="action-team" id="ag-yc-away">Away</span>
+    </button>
+
+    <button class="action-btn btn-red" data-action="red" data-team="home">
+      <span class="card-icon rc"></span>
+      <span class="action-label">RED</span>
+      <span class="action-team" id="ag-rc-home">Home</span>
+    </button>
+    <button class="action-btn btn-red" data-action="red" data-team="away">
+      <span class="card-icon rc"></span>
+      <span class="action-label">RED</span>
+      <span class="action-team" id="ag-rc-away">Away</span>
+    </button>
+
+    <button class="action-btn btn-sinbin hidden" data-action="sinbin" data-team="home" id="ag-sb-home-btn">
+      <span class="card-icon sb"></span>
+      <span class="action-label">SIN BIN</span>
+      <span class="action-team" id="ag-sb-home">Home</span>
+    </button>
+    <button class="action-btn btn-sinbin hidden" data-action="sinbin" data-team="away" id="ag-sb-away-btn">
+      <span class="card-icon sb"></span>
+      <span class="action-label">SIN BIN</span>
+      <span class="action-team" id="ag-sb-away">Away</span>
+    </button>
+  </div>
+
+  <!-- Match controls -->
+  <div class="match-controls">
+    <button id="btn-pause" class="btn-ctrl btn-pause">&#9646;&#9646; PAUSE</button>
+    <button id="btn-undo" class="btn-ctrl btn-undo">&#8592; UNDO</button>
+    <button id="btn-end-half" class="btn-ctrl btn-whistle">&#9646;&#9646; HALF TIME</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     VIEW: HALF TIME
+════════════════════════════════════════════ -->
+<div id="view-halftime" class="view">
+  <div class="summary-header ht-header">
+    <div class="summary-title">HALF TIME</div>
+    <div id="ht-competition" class="summary-comp"></div>
+    <div class="ht-score-display">
+      <span id="ht-home-name" class="ht-team">Home</span>
+      <span id="ht-home-score" class="ht-score-num">0</span>
+      <span class="ht-dash">–</span>
+      <span id="ht-away-score" class="ht-score-num">0</span>
+      <span id="ht-away-name" class="ht-team">Away</span>
+    </div>
+    <div id="ht-time-played" class="ht-time-played"></div>
+  </div>
+
+  <div class="summary-body">
+    <h3 class="summary-section-title">First Half Events</h3>
+    <div id="ht-events" class="event-list"></div>
+  </div>
+
+  <div class="summary-footer">
+    <button id="btn-start-second" class="btn-primary btn-start-half">START 2ND HALF &#9654;</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     VIEW: FULL TIME
+════════════════════════════════════════════ -->
+<div id="view-fulltime" class="view">
+  <div class="summary-header ft-header">
+    <div class="summary-title">FULL TIME</div>
+    <div id="ft-competition" class="summary-comp"></div>
+    <div class="ft-score-display">
+      <span id="ft-home-name" class="ft-team">Home</span>
+      <span id="ft-home-score" class="ft-score-num">0</span>
+      <span class="ft-dash">–</span>
+      <span id="ft-away-score" class="ft-score-num">0</span>
+      <span id="ft-away-name" class="ft-team">Away</span>
+    </div>
+    <div id="ft-match-info" class="ft-match-info"></div>
+  </div>
+
+  <div class="summary-body" id="ft-body">
+    <!-- Populated by JS -->
+  </div>
+
+  <div class="summary-footer ft-footer">
+    <button id="btn-share" class="btn-secondary">&#128279; SHARE REPORT</button>
+    <button id="btn-new-match" class="btn-primary">&#43; NEW MATCH</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     MODAL OVERLAY
+════════════════════════════════════════════ -->
+<div id="modal-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true">
+
+  <!-- Goal modal -->
+  <div id="modal-goal" class="modal hidden">
+    <h2 class="modal-title">Record Goal</h2>
+    <div class="modal-team-display" id="mg-team-display"></div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label for="mg-player">Scorer <span class="optional">(optional)</span></label>
+        <input id="mg-player" type="text" placeholder="Name or number" autocomplete="off" inputmode="text">
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-modal-cancel" id="mg-cancel">Cancel</button>
+      <button class="btn-modal-confirm btn-goal-confirm" id="mg-confirm">&#9917; GOAL</button>
+    </div>
+  </div>
+
+  <!-- Yellow card modal -->
+  <div id="modal-yellow" class="modal hidden">
+    <h2 class="modal-title">Yellow Card</h2>
+    <div class="modal-team-display yc-display" id="myc-team-display"></div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label for="myc-player">Player <span class="optional">(optional)</span></label>
+        <input id="myc-player" type="text" placeholder="Name or number" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label for="myc-offence">Offence <span class="required">*</span></label>
+        <select id="myc-offence">
+          <option value="">– select offence –</option>
+          <option value="USB">Unsporting behaviour (USB)</option>
+          <option value="DWA">Dissent by word or action (DWA)</option>
+          <option value="PO">Persistent offences (PO)</option>
+          <option value="DRTP">Delaying restart of play (DRTP)</option>
+          <option value="FTRRD">Failure to respect required distance (FTRRD)</option>
+          <option value="EFP">Entering/leaving field without permission (EFP)</option>
+          <option value="ERRA">Entering the referee review area (ERRA)</option>
+          <option value="ECG">Excessive goal celebration (ECG)</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-modal-cancel" id="myc-cancel">Cancel</button>
+      <button class="btn-modal-confirm btn-yc-confirm" id="myc-confirm">CAUTION</button>
+    </div>
+  </div>
+
+  <!-- Red card modal -->
+  <div id="modal-red" class="modal hidden">
+    <h2 class="modal-title">Red Card</h2>
+    <div class="modal-team-display rc-display" id="mrc-team-display"></div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label for="mrc-player">Player <span class="optional">(optional)</span></label>
+        <input id="mrc-player" type="text" placeholder="Name or number" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label for="mrc-offence">Offence <span class="required">*</span></label>
+        <select id="mrc-offence">
+          <option value="">– select offence –</option>
+          <option value="SFP">Serious foul play (SFP)</option>
+          <option value="VC">Violent conduct (VC)</option>
+          <option value="SAP">Spitting at a person (SAP)</option>
+          <option value="BAP">Biting a person (BAP)</option>
+          <option value="DOGSO-H">DOGSO – handball (DOGSO-H)</option>
+          <option value="DOGSO-O">DOGSO – other offence (DOGSO-O)</option>
+          <option value="OIAG">Offensive/insulting/abusive language or gestures (OIAG)</option>
+          <option value="2YC">Second yellow card (2YC)</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-modal-cancel" id="mrc-cancel">Cancel</button>
+      <button class="btn-modal-confirm btn-rc-confirm" id="mrc-confirm">SEND OFF</button>
+    </div>
+  </div>
+
+  <!-- Sin bin modal -->
+  <div id="modal-sinbin" class="modal hidden">
+    <h2 class="modal-title">Sin Bin</h2>
+    <div class="modal-team-display sb-display" id="msb-team-display"></div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label for="msb-player">Player <span class="optional">(optional)</span></label>
+        <input id="msb-player" type="text" placeholder="Name or number" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label for="msb-offence">Offence <span class="required">*</span></label>
+        <select id="msb-offence">
+          <option value="">– select offence –</option>
+          <option value="USB">Unsporting behaviour (USB)</option>
+          <option value="DWA">Dissent by word or action (DWA)</option>
+          <option value="PO">Persistent offences (PO)</option>
+          <option value="DRTP">Delaying restart of play (DRTP)</option>
+          <option value="FTRRD">Failure to respect required distance (FTRRD)</option>
+          <option value="EFP">Entering/leaving field without permission (EFP)</option>
+          <option value="ERRA">Entering the referee review area (ERRA)</option>
+          <option value="ECG">Excessive goal celebration (ECG)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="msb-duration">
+          Duration &nbsp;<strong id="msb-duration-val">10</strong> min
+        </label>
+        <input id="msb-duration" type="range" min="3" max="15" value="10" step="1">
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-modal-cancel" id="msb-cancel">Cancel</button>
+      <button class="btn-modal-confirm btn-sb-confirm" id="msb-confirm">SIN BIN</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- Toast -->
+<div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

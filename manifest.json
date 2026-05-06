@@ -1,0 +1,25 @@
+{
+  "name": "RefSix – Match Management",
+  "short_name": "RefSix",
+  "description": "Football referee match management – timer, scoreboard, cards and reports",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0a1f12",
+  "theme_color": "#1a5c2e",
+  "categories": ["sports", "utilities"],
+  "icons": [
+    {
+      "src": "icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
