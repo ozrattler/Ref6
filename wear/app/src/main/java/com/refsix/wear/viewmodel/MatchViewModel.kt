@@ -39,6 +39,9 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
     private val _state = MutableStateFlow(MatchState())
     val state: StateFlow<MatchState> = _state.asStateFlow()
 
+    private val _returnToCenter = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val returnToCenter: SharedFlow<Unit> = _returnToCenter.asSharedFlow()
+
     private val _savedMatches = MutableStateFlow(matchStorage.loadMatches())
     val savedMatches: StateFlow<List<SavedMatch>> = _savedMatches.asStateFlow()
 
@@ -85,13 +88,14 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun signalReturnToCenter() { _returnToCenter.tryEmit(Unit) }
+
     fun updateSetup(
         homeTeam: String,
         awayTeam: String,
         halfLengthMinutes: Int,
         ageGroup: AgeGroup,
-        sinBinMinutes: Int,
-        dissentAutoSinBin: Boolean
+        sinBinMinutes: Int
     ) {
         _state.update {
             it.copy(
@@ -99,8 +103,7 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
                 awayTeam = awayTeam.ifBlank { "Away" },
                 halfLengthMinutes = halfLengthMinutes.coerceIn(10, 60),
                 ageGroup = ageGroup,
-                sinBinMinutes = sinBinMinutes.coerceIn(1, 30),
-                dissentAutoSinBin = dissentAutoSinBin
+                sinBinMinutes = sinBinMinutes.coerceIn(1, 30)
             )
         }
     }
@@ -215,8 +218,7 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 cardType == CardType.YELLOW &&
-                    offence == Offences.DISSENT &&
-                    s.dissentAutoSinBin -> {
+                    offence == Offences.DISSENT -> {
                     newEvents = s.events + cardEvent
                     updatedSinBins = s.sinBins + SinBinEntry(
                         team = team,

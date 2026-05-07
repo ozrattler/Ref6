@@ -31,11 +31,8 @@ import kotlinx.coroutines.delay
 fun MatchScreen(navController: NavController, viewModel: MatchViewModel) {
     val state by viewModel.state.collectAsState()
     val pagerState = rememberPagerState(initialPage = 1) { 3 }
-    val returnToCenter by viewModel.returnToCenter.collectAsState()
-
-    LaunchedEffect(returnToCenter) {
-        if (returnToCenter) {
-            viewModel.consumeReturnToCenter()
+    LaunchedEffect(Unit) {
+        viewModel.returnToCenter.collect {
             pagerState.animateScrollToPage(1)
         }
     }
