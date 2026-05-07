@@ -1,7 +1,9 @@
 package com.refsix.wear.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -91,35 +93,30 @@ fun MatchScreen(navController: NavController, viewModel: MatchViewModel) {
                 )
             }
 
-            // Sin bin countdowns — sorted by most urgent first
+            // Sin bin countdowns — single scrollable row, sorted most urgent first
             val activeBins = state.activeSinBins
                 .sortedBy { it.remainingSeconds(state.totalElapsedSeconds) }
             if (activeBins.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(1.dp))
-                activeBins.take(3).forEach { bin ->
-                    val remaining = bin.remainingSeconds(state.totalElapsedSeconds)
-                    val urgent = remaining < 60L
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    activeBins.forEach { bin ->
+                        val remaining = bin.remainingSeconds(state.totalElapsedSeconds)
+                        val urgent = remaining < 60L
                         Text(
-                            text = "SIN  #${bin.playerNumber} ${bin.team.take(5)}  %02d:%02d".format(
+                            text = "#${bin.playerNumber} %02d:%02d".format(
                                 remaining / 60, remaining % 60
                             ),
-                            fontSize = 12.sp,
+                            fontSize = 11.sp,
                             fontWeight = if (urgent) FontWeight.Bold else FontWeight.Normal,
                             color = if (urgent) RefRed else RefOrange
                         )
                     }
-                }
-                if (activeBins.size > 3) {
-                    Text(
-                        text = "+${activeBins.size - 3} more in sin bin",
-                        style = MaterialTheme.typography.caption2,
-                        color = Color.Gray
-                    )
                 }
             }
 

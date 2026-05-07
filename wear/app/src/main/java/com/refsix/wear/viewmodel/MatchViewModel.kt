@@ -143,13 +143,10 @@ class MatchViewModel : ViewModel() {
             val minute = s.currentMatchMinute
             val half = s.currentHalf
 
+            // Yellow card count is checked FIRST — any yellow offence including Dissent
+            // triggers 2nd yellow logic when this player already has a caution.
             val isSecondYellow = cardType == CardType.YELLOW &&
                 s.playerYellowCount(team, playerNumber) >= 1
-            // Dissent auto-sin-bin only applies to a player's FIRST dissent yellow
-            val isDissentSinBin = cardType == CardType.YELLOW &&
-                offence == Offences.DISSENT &&
-                s.dissentAutoSinBin &&
-                !isSecondYellow
 
             val cardEvent = MatchEvent(
                 type = when (cardType) {
@@ -169,7 +166,7 @@ class MatchViewModel : ViewModel() {
             val alert: CardAlert?
 
             when {
-                // Red card: clear any existing sin bin for this player
+                // Red card — clear any existing sin bin for this player
                 cardType == CardType.RED -> {
                     newEvents = s.events + cardEvent
                     updatedSinBins = s.sinBins.filterNot {
@@ -178,39 +175,40 @@ class MatchViewModel : ViewModel() {
                     alert = s.cardAlert
                 }
 
-                // 2nd yellow with auto red card rule
-                isSecondYellow && s.secondYellowRule == SecondYellowRule.RED_CARD -> {
-                    val autoRed = MatchEvent(
-                        type = EventType.RED_CARD,
-                        team = team,
-                        playerNumber = playerNumber,
-                        detail = "Second caution",
-                        matchMinute = minute,
-                        half = half
-                    )
-                    newEvents = s.events + cardEvent + autoRed
-                    // Dismissed — remove from any active sin bin
-                    updatedSinBins = s.sinBins.filterNot {
-                        it.team == team && it.playerNumber == playerNumber
+                // 2nd yellow — ALWAYS takes priority over any offence-specific rule
+                isSecondYellow -> when (s.secondYellowRule) {
+                    SecondYellowRule.RED_CARD -> {
+                        val autoRed = MatchEvent(
+                            type = EventType.RED_CARD,
+                            team = team,
+                            playerNumber = playerNumber,
+                            detail = "Second caution",
+                            matchMinute = minute,
+                            half = half
+                        )
+                        newEvents = s.events + cardEvent + autoRed
+                        updatedSinBins = s.sinBins.filterNot {
+                            it.team == team && it.playerNumber == playerNumber
+                        }
+                        alert = CardAlert(team, playerNumber, CardAlertType.SECOND_YELLOW_RED, s.sinBinMinutes)
                     }
-                    alert = CardAlert(team, playerNumber, CardAlertType.SECOND_YELLOW_RED, s.sinBinMinutes)
+                    SecondYellowRule.SIN_BIN -> {
+                        newEvents = s.events + cardEvent
+                        updatedSinBins = s.sinBins + SinBinEntry(
+                            team = team,
+                            playerNumber = playerNumber,
+                            offence = "Second caution",
+                            startElapsedSeconds = s.totalElapsedSeconds,
+                            durationSeconds = s.sinBinDurationSeconds
+                        )
+                        alert = CardAlert(team, playerNumber, CardAlertType.SECOND_YELLOW_SIN_BIN, s.sinBinMinutes)
+                    }
                 }
 
-                // 2nd yellow with sin bin rule — referee can escalate to red manually
-                isSecondYellow && s.secondYellowRule == SecondYellowRule.SIN_BIN -> {
-                    newEvents = s.events + cardEvent
-                    updatedSinBins = s.sinBins + SinBinEntry(
-                        team = team,
-                        playerNumber = playerNumber,
-                        offence = "Second caution",
-                        startElapsedSeconds = s.totalElapsedSeconds,
-                        durationSeconds = s.sinBinDurationSeconds
-                    )
-                    alert = CardAlert(team, playerNumber, CardAlertType.SECOND_YELLOW_SIN_BIN, s.sinBinMinutes)
-                }
-
-                // Dissent yellow — automatically serves a sin bin
-                isDissentSinBin -> {
+                // Dissent yellow (first caution only — 2nd yellow already handled above)
+                cardType == CardType.YELLOW &&
+                    offence == Offences.DISSENT &&
+                    s.dissentAutoSinBin -> {
                     newEvents = s.events + cardEvent
                     updatedSinBins = s.sinBins + SinBinEntry(
                         team = team,
@@ -235,7 +233,7 @@ class MatchViewModel : ViewModel() {
                     alert = s.cardAlert
                 }
 
-                // Standard yellow or red — no special handling
+                // Standard yellow — no special handling
                 else -> {
                     newEvents = s.events + cardEvent
                     updatedSinBins = s.sinBins
