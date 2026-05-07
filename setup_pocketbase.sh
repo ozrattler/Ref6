@@ -88,12 +88,12 @@ ensure_fields() {
     fi
 }
 
-# Sets list/view/create/update rules to "" (public) on a collection by id.
+# Sets all CRUD rules to "" (public) on a collection by id.
 set_public_rules() {
     local cid=$1
     curl -s -o /dev/null -X PATCH "$PB_URL/api/collections/$cid" \
         -H "$AUTH_HEADER" -H "Content-Type: application/json" \
-        -d '{"listRule":"","viewRule":"","createRule":"","updateRule":""}'
+        -d '{"listRule":"","viewRule":"","createRule":"","updateRule":"","deleteRule":""}'
 }
 
 # Shared field definitions reused across collections

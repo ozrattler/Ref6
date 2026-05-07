@@ -44,6 +44,35 @@ body {
 }
 .page { }
 
+/* ── Database setup banner ── */
+.db-banner {
+  background: rgba(234,179,8,.15);
+  border: 1px solid rgba(234,179,8,.35);
+  color: #fde68a;
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+
+/* ── Init log in settings modal ── */
+.init-log {
+  background: #0d1117;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  font-size: 0.78rem;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  color: #86efac;
+  line-height: 1.7;
+  margin-bottom: 8px;
+  max-height: 160px;
+  overflow-y: auto;
+}
+.init-log-error { color: var(--muted); }
+.init-log-err-line { color: #fca5a5; }
+
 /* ── Navbar ── */
 .navbar {
   position: fixed;
