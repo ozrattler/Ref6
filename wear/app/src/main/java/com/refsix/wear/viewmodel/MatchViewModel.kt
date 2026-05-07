@@ -65,7 +65,8 @@ class MatchViewModel : ViewModel() {
         halfLengthMinutes: Int,
         ageGroup: AgeGroup,
         sinBinMinutes: Int,
-        secondYellowRule: SecondYellowRule
+        secondYellowRule: SecondYellowRule,
+        dissentAutoSinBin: Boolean
     ) {
         _state.update {
             it.copy(
@@ -74,7 +75,8 @@ class MatchViewModel : ViewModel() {
                 halfLengthMinutes = halfLengthMinutes.coerceIn(10, 60),
                 ageGroup = ageGroup,
                 sinBinMinutes = sinBinMinutes.coerceIn(1, 30),
-                secondYellowRule = secondYellowRule
+                secondYellowRule = secondYellowRule,
+                dissentAutoSinBin = dissentAutoSinBin
             )
         }
     }
@@ -91,7 +93,7 @@ class MatchViewModel : ViewModel() {
                 awayScore = 0,
                 events = emptyList(),
                 sinBins = emptyList(),
-                secondYellowAlert = null
+                cardAlert = null
             )
         }
     }
@@ -140,8 +142,14 @@ class MatchViewModel : ViewModel() {
         _state.update { s ->
             val minute = s.currentMatchMinute
             val half = s.currentHalf
+
             val isSecondYellow = cardType == CardType.YELLOW &&
                 s.playerYellowCount(team, playerNumber) >= 1
+            // Dissent auto-sin-bin only applies to a player's FIRST dissent yellow
+            val isDissentSinBin = cardType == CardType.YELLOW &&
+                offence == Offences.DISSENT &&
+                s.dissentAutoSinBin &&
+                !isSecondYellow
 
             val cardEvent = MatchEvent(
                 type = when (cardType) {
@@ -158,9 +166,19 @@ class MatchViewModel : ViewModel() {
 
             val newEvents: List<MatchEvent>
             val updatedSinBins: List<SinBinEntry>
-            val alert: SecondYellowAlert?
+            val alert: CardAlert?
 
             when {
+                // Red card: clear any existing sin bin for this player
+                cardType == CardType.RED -> {
+                    newEvents = s.events + cardEvent
+                    updatedSinBins = s.sinBins.filterNot {
+                        it.team == team && it.playerNumber == playerNumber
+                    }
+                    alert = s.cardAlert
+                }
+
+                // 2nd yellow with auto red card rule
                 isSecondYellow && s.secondYellowRule == SecondYellowRule.RED_CARD -> {
                     val autoRed = MatchEvent(
                         type = EventType.RED_CARD,
@@ -171,20 +189,40 @@ class MatchViewModel : ViewModel() {
                         half = half
                     )
                     newEvents = s.events + cardEvent + autoRed
-                    updatedSinBins = s.sinBins
-                    alert = SecondYellowAlert(team, playerNumber, SecondYellowRule.RED_CARD)
+                    // Dismissed — remove from any active sin bin
+                    updatedSinBins = s.sinBins.filterNot {
+                        it.team == team && it.playerNumber == playerNumber
+                    }
+                    alert = CardAlert(team, playerNumber, CardAlertType.SECOND_YELLOW_RED, s.sinBinMinutes)
                 }
+
+                // 2nd yellow with sin bin rule — referee can escalate to red manually
                 isSecondYellow && s.secondYellowRule == SecondYellowRule.SIN_BIN -> {
                     newEvents = s.events + cardEvent
                     updatedSinBins = s.sinBins + SinBinEntry(
                         team = team,
                         playerNumber = playerNumber,
-                        offence = "Second caution – sin bin",
+                        offence = "Second caution",
                         startElapsedSeconds = s.totalElapsedSeconds,
                         durationSeconds = s.sinBinDurationSeconds
                     )
-                    alert = SecondYellowAlert(team, playerNumber, SecondYellowRule.SIN_BIN)
+                    alert = CardAlert(team, playerNumber, CardAlertType.SECOND_YELLOW_SIN_BIN, s.sinBinMinutes)
                 }
+
+                // Dissent yellow — automatically serves a sin bin
+                isDissentSinBin -> {
+                    newEvents = s.events + cardEvent
+                    updatedSinBins = s.sinBins + SinBinEntry(
+                        team = team,
+                        playerNumber = playerNumber,
+                        offence = "Dissent",
+                        startElapsedSeconds = s.totalElapsedSeconds,
+                        durationSeconds = s.sinBinDurationSeconds
+                    )
+                    alert = CardAlert(team, playerNumber, CardAlertType.DISSENT_SIN_BIN, s.sinBinMinutes)
+                }
+
+                // Standard sin bin card
                 cardType == CardType.SIN_BIN -> {
                     newEvents = s.events + cardEvent
                     updatedSinBins = s.sinBins + SinBinEntry(
@@ -194,21 +232,23 @@ class MatchViewModel : ViewModel() {
                         startElapsedSeconds = s.totalElapsedSeconds,
                         durationSeconds = s.sinBinDurationSeconds
                     )
-                    alert = s.secondYellowAlert
+                    alert = s.cardAlert
                 }
+
+                // Standard yellow or red — no special handling
                 else -> {
                     newEvents = s.events + cardEvent
                     updatedSinBins = s.sinBins
-                    alert = s.secondYellowAlert
+                    alert = s.cardAlert
                 }
             }
 
-            s.copy(events = newEvents, sinBins = updatedSinBins, secondYellowAlert = alert)
+            s.copy(events = newEvents, sinBins = updatedSinBins, cardAlert = alert)
         }
     }
 
-    fun dismissSecondYellowAlert() {
-        _state.update { it.copy(secondYellowAlert = null) }
+    fun dismissCardAlert() {
+        _state.update { it.copy(cardAlert = null) }
     }
 
     fun returnFromSinBin(sinBinId: Long) {

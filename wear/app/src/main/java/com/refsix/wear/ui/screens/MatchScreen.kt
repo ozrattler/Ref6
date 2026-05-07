@@ -15,8 +15,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.wear.compose.material.*
+import com.refsix.wear.data.CardAlertType
 import com.refsix.wear.data.MatchPhase
-import com.refsix.wear.data.SecondYellowRule
 import com.refsix.wear.ui.theme.*
 import com.refsix.wear.viewmodel.MatchViewModel
 
@@ -175,8 +175,8 @@ fun MatchScreen(navController: NavController, viewModel: MatchViewModel) {
             }
         }
 
-        // Second yellow alert overlay
-        state.secondYellowAlert?.let { alert ->
+        // Card alert overlay (2nd yellow or dissent auto sin bin)
+        state.cardAlert?.let { alert ->
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -191,43 +191,21 @@ fun MatchScreen(navController: NavController, viewModel: MatchViewModel) {
                         .background(Color(0xFF1A0000))
                         .padding(horizontal = 16.dp, vertical = 12.dp)
                 ) {
-                    Text(
-                        text = "2ND YELLOW",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = RefYellow,
-                        textAlign = TextAlign.Center
-                    )
-                    when (alert.rule) {
-                        SecondYellowRule.RED_CARD -> {
-                            Text(
-                                text = "AUTO RED CARD",
-                                fontSize = 20.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = RefRed,
-                                textAlign = TextAlign.Center
-                            )
-                            Text(
-                                text = "Player dismissed",
-                                style = MaterialTheme.typography.caption2,
-                                color = Color.Gray,
-                                textAlign = TextAlign.Center
-                            )
+                    when (alert.type) {
+                        CardAlertType.SECOND_YELLOW_RED -> {
+                            Text("2ND YELLOW", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = RefYellow, textAlign = TextAlign.Center)
+                            Text("AUTO RED CARD", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = RefRed, textAlign = TextAlign.Center)
+                            Text("Player dismissed", style = MaterialTheme.typography.caption2, color = Color.Gray, textAlign = TextAlign.Center)
                         }
-                        SecondYellowRule.SIN_BIN -> {
-                            Text(
-                                text = "AUTO SIN BIN",
-                                fontSize = 20.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = RefOrange,
-                                textAlign = TextAlign.Center
-                            )
-                            Text(
-                                text = "${state.sinBinMinutes} min sin bin",
-                                style = MaterialTheme.typography.caption2,
-                                color = Color.Gray,
-                                textAlign = TextAlign.Center
-                            )
+                        CardAlertType.SECOND_YELLOW_SIN_BIN -> {
+                            Text("2ND YELLOW", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = RefYellow, textAlign = TextAlign.Center)
+                            Text("SIN BIN", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = RefOrange, textAlign = TextAlign.Center)
+                            Text("${alert.sinBinMinutes} min — escalate to red if needed", style = MaterialTheme.typography.caption2, color = Color.Gray, textAlign = TextAlign.Center)
+                        }
+                        CardAlertType.DISSENT_SIN_BIN -> {
+                            Text("DISSENT", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = RefYellow, textAlign = TextAlign.Center)
+                            Text("AUTO SIN BIN", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = RefOrange, textAlign = TextAlign.Center)
+                            Text("${alert.sinBinMinutes} min", style = MaterialTheme.typography.caption2, color = Color.Gray, textAlign = TextAlign.Center)
                         }
                     }
                     Text(
@@ -239,11 +217,11 @@ fun MatchScreen(navController: NavController, viewModel: MatchViewModel) {
                     Spacer(modifier = Modifier.height(2.dp))
                     Chip(
                         label = { Text("OK", fontWeight = FontWeight.Bold) },
-                        onClick = { viewModel.dismissSecondYellowAlert() },
+                        onClick = { viewModel.dismissCardAlert() },
                         colors = ChipDefaults.chipColors(
-                            backgroundColor = when (alert.rule) {
-                                SecondYellowRule.RED_CARD -> RefRed
-                                SecondYellowRule.SIN_BIN -> RefOrange
+                            backgroundColor = when (alert.type) {
+                                CardAlertType.SECOND_YELLOW_RED -> RefRed
+                                else -> RefOrange
                             }
                         ),
                         modifier = Modifier.fillMaxWidth()

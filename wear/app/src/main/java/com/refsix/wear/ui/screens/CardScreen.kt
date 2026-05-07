@@ -31,13 +31,22 @@ fun CardScreen(viewModel: MatchViewModel, onCardRecorded: () -> Unit) {
     var playerNumber by remember { mutableIntStateOf(1) }
     var selectedOffence by remember { mutableStateOf<String?>(null) }
 
+    // Pre-compute flags used across multiple items
+    val isSecondYellow = selectedCard == CardType.YELLOW &&
+        selectedTeam != null &&
+        state.playerYellowCount(selectedTeam!!, "$playerNumber") >= 1
+
+    val isDissentSelected = selectedCard == CardType.YELLOW &&
+        selectedOffence == Offences.DISSENT &&
+        state.dissentAutoSinBin &&
+        !isSecondYellow
+
     ScalingLazyColumn(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 28.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        // Title
         item {
             Text(
                 text = "CARD",
@@ -48,9 +57,7 @@ fun CardScreen(viewModel: MatchViewModel, onCardRecorded: () -> Unit) {
         }
 
         // Step 1: Team
-        item {
-            SectionLabel("1. Team")
-        }
+        item { SectionLabel("1. Team") }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 SelectChip(
@@ -110,37 +117,20 @@ fun CardScreen(viewModel: MatchViewModel, onCardRecorded: () -> Unit) {
             }
         }
 
-        // Second-yellow warning
-        if (selectedCard == CardType.YELLOW && selectedTeam != null) {
-            val yellows = state.playerYellowCount(selectedTeam!!, "$playerNumber")
-            if (yellows >= 1) {
-                item {
-                    val (warningText, warningColor) = when (state.secondYellowRule) {
-                        SecondYellowRule.RED_CARD ->
-                            "2nd yellow — auto RED CARD" to RefRed
-                        SecondYellowRule.SIN_BIN ->
-                            "2nd yellow — auto SIN BIN (${state.sinBinMinutes}min)" to RefOrange
-                    }
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(Color(0xFF2A1A00))
-                            .border(1.dp, warningColor, RoundedCornerShape(6.dp))
-                            .padding(horizontal = 10.dp, vertical = 6.dp)
-                    ) {
-                        Text(
-                            text = warningText,
-                            style = MaterialTheme.typography.caption2,
-                            color = warningColor,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
+        // 2nd yellow warning — shown as soon as player # is set and a second yellow is detected
+        if (isSecondYellow) {
+            item {
+                val (text, color) = when (state.secondYellowRule) {
+                    SecondYellowRule.SIN_BIN ->
+                        "2nd yellow — auto SIN BIN (${state.sinBinMinutes} min)" to RefOrange
+                    SecondYellowRule.RED_CARD ->
+                        "2nd yellow — auto RED CARD" to RefRed
                 }
+                NoticeBanner(text = text, color = color)
             }
         }
 
-        // Step 4: Offence (show only when card type is selected)
+        // Step 4: Offence
         if (selectedCard != null) {
             item { SectionLabel("4. Offence") }
 
@@ -148,25 +138,66 @@ fun CardScreen(viewModel: MatchViewModel, onCardRecorded: () -> Unit) {
             items(offences.size) { index ->
                 val offence = offences[index]
                 val isSelected = selectedOffence == offence
+                // Dissent gets orange highlight when auto-sin-bin rule is active
+                val isDissent = offence == Offences.DISSENT &&
+                    selectedCard == CardType.YELLOW &&
+                    state.dissentAutoSinBin &&
+                    !isSecondYellow
+
+                val borderColor = when {
+                    isSelected -> RefGreen
+                    isDissent -> RefOrange.copy(alpha = 0.6f)
+                    else -> Color.Transparent
+                }
+                val bgColor = when {
+                    isSelected -> Color(0xFF1A2A1A)
+                    isDissent -> Color(0xFF2A1E00)
+                    else -> Color(0xFF1E1E1E)
+                }
+
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(8.dp))
-                        .background(if (isSelected) Color(0xFF2A3A2A) else Color(0xFF1E1E1E))
-                        .border(
-                            width = if (isSelected) 1.dp else 0.dp,
-                            color = if (isSelected) RefGreen else Color.Transparent,
-                            shape = RoundedCornerShape(8.dp)
-                        )
+                        .background(bgColor)
+                        .border(1.dp, borderColor, RoundedCornerShape(8.dp))
                         .clickable { selectedOffence = offence }
                         .padding(horizontal = 10.dp, vertical = 8.dp)
                 ) {
-                    Text(
-                        text = offence,
-                        style = MaterialTheme.typography.caption1,
-                        color = if (isSelected) RefGreen else Color.White
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = offence,
+                            style = MaterialTheme.typography.caption1,
+                            color = when {
+                                isSelected -> RefGreen
+                                isDissent -> RefOrange
+                                else -> Color.White
+                            }
+                        )
+                        if (isDissent) {
+                            Text(
+                                text = "→ sin bin",
+                                fontSize = 10.sp,
+                                color = RefOrange,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
                 }
+            }
+        }
+
+        // Post-selection notice for dissent auto sin bin
+        if (isDissentSelected) {
+            item {
+                NoticeBanner(
+                    text = "Dissent — auto SIN BIN (${state.sinBinMinutes} min)",
+                    color = RefOrange
+                )
             }
         }
 
@@ -174,11 +205,12 @@ fun CardScreen(viewModel: MatchViewModel, onCardRecorded: () -> Unit) {
         if (selectedTeam != null && selectedCard != null && selectedOffence != null) {
             item { Spacer(modifier = Modifier.height(4.dp)) }
             item {
-                val cardColor = when (selectedCard) {
-                    CardType.YELLOW -> RefYellow
-                    CardType.RED -> RefRed
-                    CardType.SIN_BIN -> RefOrange
-                    null -> Color.Gray
+                val chipColor = when {
+                    isSecondYellow && state.secondYellowRule == SecondYellowRule.RED_CARD -> RefRed
+                    isSecondYellow || isDissentSelected -> RefOrange
+                    selectedCard == CardType.RED -> RefRed
+                    selectedCard == CardType.SIN_BIN -> RefOrange
+                    else -> RefYellow
                 }
                 Chip(
                     label = { Text("CONFIRM", fontWeight = FontWeight.Bold) },
@@ -191,11 +223,30 @@ fun CardScreen(viewModel: MatchViewModel, onCardRecorded: () -> Unit) {
                         )
                         onCardRecorded()
                     },
-                    colors = ChipDefaults.chipColors(backgroundColor = cardColor),
+                    colors = ChipDefaults.chipColors(backgroundColor = chipColor),
                     modifier = Modifier.fillMaxWidth()
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun NoticeBanner(text: String, color: Color) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(6.dp))
+            .background(color.copy(alpha = 0.12f))
+            .border(1.dp, color, RoundedCornerShape(6.dp))
+            .padding(horizontal = 10.dp, vertical = 6.dp)
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.caption2,
+            color = color,
+            fontWeight = FontWeight.Bold
+        )
     }
 }
 

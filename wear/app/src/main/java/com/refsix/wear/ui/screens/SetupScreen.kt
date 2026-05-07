@@ -34,6 +34,7 @@ fun SetupScreen(viewModel: MatchViewModel, onStartMatch: () -> Unit) {
     var ageGroup by remember { mutableStateOf(state.ageGroup) }
     var sinBinMinutes by remember { mutableIntStateOf(state.sinBinMinutes) }
     var secondYellowRule by remember { mutableStateOf(state.secondYellowRule) }
+    var dissentAutoSinBin by remember { mutableStateOf(state.dissentAutoSinBin) }
 
     ScalingLazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -91,16 +92,34 @@ fun SetupScreen(viewModel: MatchViewModel, onStartMatch: () -> Unit) {
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 RuleChip(
+                    label = "Sin Bin",
+                    selected = secondYellowRule == SecondYellowRule.SIN_BIN,
+                    activeColor = RefOrange,
+                    onClick = { secondYellowRule = SecondYellowRule.SIN_BIN }
+                )
+                RuleChip(
                     label = "Red Card",
                     selected = secondYellowRule == SecondYellowRule.RED_CARD,
                     activeColor = RefRed,
                     onClick = { secondYellowRule = SecondYellowRule.RED_CARD }
                 )
+            }
+        }
+
+        item { FieldLabel("Dissent Rule") }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 RuleChip(
-                    label = "Sin Bin",
-                    selected = secondYellowRule == SecondYellowRule.SIN_BIN,
+                    label = "Auto Sin Bin",
+                    selected = dissentAutoSinBin,
                     activeColor = RefOrange,
-                    onClick = { secondYellowRule = SecondYellowRule.SIN_BIN }
+                    onClick = { dissentAutoSinBin = true }
+                )
+                RuleChip(
+                    label = "Yellow Only",
+                    selected = !dissentAutoSinBin,
+                    activeColor = Color(0xFF555555),
+                    onClick = { dissentAutoSinBin = false }
                 )
             }
         }
@@ -111,7 +130,7 @@ fun SetupScreen(viewModel: MatchViewModel, onStartMatch: () -> Unit) {
             Chip(
                 label = { Text("START MATCH", fontWeight = FontWeight.Bold) },
                 onClick = {
-                    viewModel.updateSetup(homeTeam, awayTeam, halfLength, ageGroup, sinBinMinutes, secondYellowRule)
+                    viewModel.updateSetup(homeTeam, awayTeam, halfLength, ageGroup, sinBinMinutes, secondYellowRule, dissentAutoSinBin)
                     viewModel.startMatch()
                     onStartMatch()
                 },

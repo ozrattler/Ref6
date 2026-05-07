@@ -20,10 +20,17 @@ enum class SecondYellowRule(val label: String) {
     SIN_BIN("Sin Bin")
 }
 
-data class SecondYellowAlert(
+enum class CardAlertType {
+    SECOND_YELLOW_RED,      // 2nd yellow → auto red card (dismissed)
+    SECOND_YELLOW_SIN_BIN,  // 2nd yellow → auto sin bin (can escalate)
+    DISSENT_SIN_BIN         // dissent yellow → auto sin bin
+}
+
+data class CardAlert(
     val team: String,
     val playerNumber: String,
-    val rule: SecondYellowRule
+    val type: CardAlertType,
+    val sinBinMinutes: Int = 10
 )
 
 data class MatchEvent(
@@ -56,7 +63,10 @@ data class MatchState(
     val halfLengthMinutes: Int = 45,
     val ageGroup: AgeGroup = AgeGroup.OPEN_SENIOR,
     val sinBinMinutes: Int = 10,
-    val secondYellowRule: SecondYellowRule = SecondYellowRule.RED_CARD,
+    // Default: 2nd yellow → sin bin; referee escalates to red manually if needed
+    val secondYellowRule: SecondYellowRule = SecondYellowRule.SIN_BIN,
+    // Default: dissent automatically triggers a sin bin in addition to the caution
+    val dissentAutoSinBin: Boolean = true,
     val homeScore: Int = 0,
     val awayScore: Int = 0,
     val currentHalf: Int = 1,
@@ -66,7 +76,7 @@ data class MatchState(
     val phase: MatchPhase = MatchPhase.SETUP,
     val events: List<MatchEvent> = emptyList(),
     val sinBins: List<SinBinEntry> = emptyList(),
-    val secondYellowAlert: SecondYellowAlert? = null
+    val cardAlert: CardAlert? = null
 ) {
     val halfLengthSeconds: Long get() = halfLengthMinutes * 60L
     val isInAdditionalTime: Boolean get() = halfElapsedSeconds > halfLengthSeconds
@@ -96,12 +106,17 @@ data class MatchState(
 
     fun playerYellowCount(team: String, playerNumber: String): Int =
         events.count { it.type == EventType.YELLOW_CARD && it.team == team && it.playerNumber == playerNumber }
+
+    fun playerInSinBin(team: String, playerNumber: String): Boolean =
+        activeSinBins.any { it.team == team && it.playerNumber == playerNumber }
 }
 
 object Offences {
+    const val DISSENT = "Dissent"
+
     val yellow = listOf(
         "Unsporting behaviour",
-        "Dissent",
+        DISSENT,
         "Persistent infringement",
         "Delaying restart",
         "Failure to respect distance",
@@ -121,7 +136,7 @@ object Offences {
 
     val sinBin = listOf(
         "Unsporting behaviour",
-        "Dissent",
+        DISSENT,
         "Delaying restart",
         "Failure to respect distance",
         "Encroachment at penalty"
