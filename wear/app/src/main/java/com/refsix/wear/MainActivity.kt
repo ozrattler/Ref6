@@ -1,23 +1,60 @@
 package com.refsix.wear
 
 import android.os.Bundle
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.wear.compose.navigation.SwipeDismissableNavHost
 import androidx.wear.compose.navigation.composable
 import androidx.wear.compose.navigation.rememberSwipeDismissableNavController
 import com.refsix.wear.ui.screens.*
 import com.refsix.wear.ui.theme.Ref6Theme
+import com.refsix.wear.viewmodel.MatchUiEvent
 import com.refsix.wear.viewmodel.MatchViewModel
 
 class MainActivity : ComponentActivity() {
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        val vibrator = getSystemService(Vibrator::class.java)
+
         setContent {
             Ref6Theme {
                 val navController = rememberSwipeDismissableNavController()
                 val matchViewModel: MatchViewModel = viewModel()
+                val state by matchViewModel.state.collectAsState()
+
+                // Keep screen on while the match clock is running
+                LaunchedEffect(state.isRunning) {
+                    if (state.isRunning) {
+                        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                    } else {
+                        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                    }
+                }
+
+                // Vibrate when a sin bin expires — works regardless of which screen is showing
+                LaunchedEffect(Unit) {
+                    matchViewModel.uiEvents.collect { event ->
+                        when (event) {
+                            is MatchUiEvent.SinBinExpired -> {
+                                vibrator?.vibrate(
+                                    VibrationEffect.createWaveform(
+                                        longArrayOf(0, 300, 150, 300, 150, 300),
+                                        -1
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
 
                 SwipeDismissableNavHost(
                     navController = navController,

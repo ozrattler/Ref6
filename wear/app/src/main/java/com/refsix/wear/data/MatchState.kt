@@ -15,7 +15,16 @@ enum class AgeGroup(val label: String, val sinBinMinutes: Int) {
     U10("U10", 5)
 }
 
-data class SecondYellowAlert(val team: String, val playerNumber: String)
+enum class SecondYellowRule(val label: String) {
+    RED_CARD("Red Card"),
+    SIN_BIN("Sin Bin")
+}
+
+data class SecondYellowAlert(
+    val team: String,
+    val playerNumber: String,
+    val rule: SecondYellowRule
+)
 
 data class MatchEvent(
     val id: Long = System.currentTimeMillis(),
@@ -46,6 +55,8 @@ data class MatchState(
     val awayTeam: String = "Away",
     val halfLengthMinutes: Int = 45,
     val ageGroup: AgeGroup = AgeGroup.OPEN_SENIOR,
+    val sinBinMinutes: Int = 10,
+    val secondYellowRule: SecondYellowRule = SecondYellowRule.RED_CARD,
     val homeScore: Int = 0,
     val awayScore: Int = 0,
     val currentHalf: Int = 1,
@@ -60,7 +71,7 @@ data class MatchState(
     val halfLengthSeconds: Long get() = halfLengthMinutes * 60L
     val isInAdditionalTime: Boolean get() = halfElapsedSeconds > halfLengthSeconds
     val additionalSeconds: Long get() = maxOf(0L, halfElapsedSeconds - halfLengthSeconds)
-    val sinBinDurationSeconds: Long get() = ageGroup.sinBinMinutes * 60L
+    val sinBinDurationSeconds: Long get() = sinBinMinutes * 60L
 
     val displayMinutes: Int get() = when (phase) {
         MatchPhase.SECOND_HALF, MatchPhase.FULL_TIME ->

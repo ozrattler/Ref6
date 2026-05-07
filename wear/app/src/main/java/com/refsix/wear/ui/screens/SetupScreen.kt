@@ -20,7 +20,8 @@ import androidx.compose.ui.unit.sp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.material.*
 import com.refsix.wear.data.AgeGroup
-import com.refsix.wear.ui.theme.RefGreen
+import com.refsix.wear.data.SecondYellowRule
+import com.refsix.wear.ui.theme.*
 import com.refsix.wear.viewmodel.MatchViewModel
 
 @Composable
@@ -31,6 +32,8 @@ fun SetupScreen(viewModel: MatchViewModel, onStartMatch: () -> Unit) {
     var awayTeam by remember { mutableStateOf(state.awayTeam) }
     var halfLength by remember { mutableIntStateOf(state.halfLengthMinutes) }
     var ageGroup by remember { mutableStateOf(state.ageGroup) }
+    var sinBinMinutes by remember { mutableIntStateOf(state.sinBinMinutes) }
+    var secondYellowRule by remember { mutableStateOf(state.secondYellowRule) }
 
     ScalingLazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -47,75 +50,59 @@ fun SetupScreen(viewModel: MatchViewModel, onStartMatch: () -> Unit) {
             )
         }
 
+        item { FieldLabel("Home Team") }
+        item { TeamNameField(value = homeTeam, onValueChange = { homeTeam = it }) }
+
+        item { FieldLabel("Away Team") }
+        item { TeamNameField(value = awayTeam, onValueChange = { awayTeam = it }) }
+
+        item { FieldLabel("Age Group") }
         item {
-            Text(
-                text = "Home Team",
-                style = MaterialTheme.typography.caption1,
-                color = Color.Gray
+            AgeGroupPicker(
+                selected = ageGroup,
+                onSelect = { group ->
+                    ageGroup = group
+                    sinBinMinutes = group.sinBinMinutes
+                }
             )
-        }
-        item {
-            TeamNameField(value = homeTeam, onValueChange = { homeTeam = it })
         }
 
+        item { FieldLabel("Half Length") }
         item {
-            Text(
-                text = "Away Team",
-                style = MaterialTheme.typography.caption1,
-                color = Color.Gray
+            StepperRow(
+                value = halfLength,
+                label = "$halfLength min",
+                onDecrement = { if (halfLength > 10) halfLength-- },
+                onIncrement = { if (halfLength < 60) halfLength++ }
             )
-        }
-        item {
-            TeamNameField(value = awayTeam, onValueChange = { awayTeam = it })
         }
 
+        item { FieldLabel("Sin Bin Duration") }
         item {
-            Text(
-                text = "Age Group",
-                style = MaterialTheme.typography.caption1,
-                color = Color.Gray
+            StepperRow(
+                value = sinBinMinutes,
+                label = "$sinBinMinutes min",
+                onDecrement = { if (sinBinMinutes > 1) sinBinMinutes-- },
+                onIncrement = { if (sinBinMinutes < 30) sinBinMinutes++ }
             )
-        }
-        item {
-            AgeGroupPicker(selected = ageGroup, onSelect = { ageGroup = it })
         }
 
+        item { FieldLabel("2nd Yellow Rule") }
         item {
-            Text(
-                text = "Half Length",
-                style = MaterialTheme.typography.caption1,
-                color = Color.Gray
-            )
-        }
-        item {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                CompactChip(
-                    label = { Text("−") },
-                    onClick = { if (halfLength > 10) halfLength-- }
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                RuleChip(
+                    label = "Red Card",
+                    selected = secondYellowRule == SecondYellowRule.RED_CARD,
+                    activeColor = RefRed,
+                    onClick = { secondYellowRule = SecondYellowRule.RED_CARD }
                 )
-                Text(
-                    text = "$halfLength min",
-                    style = MaterialTheme.typography.body1,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.width(52.dp),
-                    textAlign = TextAlign.Center
-                )
-                CompactChip(
-                    label = { Text("+") },
-                    onClick = { if (halfLength < 60) halfLength++ }
+                RuleChip(
+                    label = "Sin Bin",
+                    selected = secondYellowRule == SecondYellowRule.SIN_BIN,
+                    activeColor = RefOrange,
+                    onClick = { secondYellowRule = SecondYellowRule.SIN_BIN }
                 )
             }
-        }
-
-        item {
-            Text(
-                text = "Sin bin: ${ageGroup.sinBinMinutes} min",
-                style = MaterialTheme.typography.caption2,
-                color = Color.Gray
-            )
         }
 
         item { Spacer(modifier = Modifier.height(4.dp)) }
@@ -124,7 +111,7 @@ fun SetupScreen(viewModel: MatchViewModel, onStartMatch: () -> Unit) {
             Chip(
                 label = { Text("START MATCH", fontWeight = FontWeight.Bold) },
                 onClick = {
-                    viewModel.updateSetup(homeTeam, awayTeam, halfLength, ageGroup)
+                    viewModel.updateSetup(homeTeam, awayTeam, halfLength, ageGroup, sinBinMinutes, secondYellowRule)
                     viewModel.startMatch()
                     onStartMatch()
                 },
@@ -136,10 +123,36 @@ fun SetupScreen(viewModel: MatchViewModel, onStartMatch: () -> Unit) {
 }
 
 @Composable
+private fun FieldLabel(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.caption1,
+        color = Color.Gray
+    )
+}
+
+@Composable
+private fun StepperRow(value: Int, label: String, onDecrement: () -> Unit, onIncrement: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        CompactChip(label = { Text("−") }, onClick = onDecrement)
+        Text(
+            text = label,
+            style = MaterialTheme.typography.body1,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.width(56.dp),
+            textAlign = TextAlign.Center
+        )
+        CompactChip(label = { Text("+") }, onClick = onIncrement)
+    }
+}
+
+@Composable
 private fun AgeGroupPicker(selected: AgeGroup, onSelect: (AgeGroup) -> Unit) {
     val groups = AgeGroup.entries
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        // Row 1: Open/Senior, U18, U16
         Row(
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             modifier = Modifier.fillMaxWidth()
@@ -153,7 +166,6 @@ private fun AgeGroupPicker(selected: AgeGroup, onSelect: (AgeGroup) -> Unit) {
                 )
             }
         }
-        // Row 2: U14, U12, U10
         Row(
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             modifier = Modifier.fillMaxWidth()
@@ -176,11 +188,7 @@ private fun AgeGroupChip(label: String, selected: Boolean, onClick: () -> Unit, 
         modifier = modifier
             .clip(RoundedCornerShape(6.dp))
             .background(if (selected) RefGreen else Color(0xFF2A2A2A))
-            .border(
-                width = if (selected) 0.dp else 1.dp,
-                color = Color(0xFF444444),
-                shape = RoundedCornerShape(6.dp)
-            )
+            .border(1.dp, if (selected) RefGreen else Color(0xFF444444), RoundedCornerShape(6.dp))
             .clickable { onClick() }
             .padding(vertical = 6.dp),
         contentAlignment = Alignment.Center
@@ -193,6 +201,18 @@ private fun AgeGroupChip(label: String, selected: Boolean, onClick: () -> Unit, 
             textAlign = TextAlign.Center
         )
     }
+}
+
+@Composable
+private fun RuleChip(label: String, selected: Boolean, activeColor: Color, onClick: () -> Unit) {
+    CompactChip(
+        label = { Text(label, fontWeight = FontWeight.Bold) },
+        onClick = onClick,
+        colors = if (selected)
+            ChipDefaults.chipColors(backgroundColor = activeColor)
+        else
+            ChipDefaults.chipColors(backgroundColor = Color(0xFF333333))
+    )
 }
 
 @Composable

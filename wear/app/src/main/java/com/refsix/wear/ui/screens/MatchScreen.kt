@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.wear.compose.material.*
 import com.refsix.wear.data.MatchPhase
+import com.refsix.wear.data.SecondYellowRule
 import com.refsix.wear.ui.theme.*
 import com.refsix.wear.viewmodel.MatchViewModel
 
@@ -29,10 +30,9 @@ fun MatchScreen(navController: NavController, viewModel: MatchViewModel) {
             .background(Color.Black),
         contentAlignment = Alignment.Center
     ) {
-        // Main match content
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            verticalArrangement = Arrangement.spacedBy(3.dp),
             modifier = Modifier.padding(horizontal = 8.dp)
         ) {
             Text(
@@ -91,15 +91,39 @@ fun MatchScreen(navController: NavController, viewModel: MatchViewModel) {
                 )
             }
 
-            if (state.activeSinBins.isNotEmpty()) {
-                Text(
-                    text = "[ ${state.activeSinBins.size} IN SIN BIN ]",
-                    style = MaterialTheme.typography.caption2,
-                    color = RefOrange
-                )
+            // Sin bin countdowns — sorted by most urgent first
+            val activeBins = state.activeSinBins
+                .sortedBy { it.remainingSeconds(state.totalElapsedSeconds) }
+            if (activeBins.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(1.dp))
+                activeBins.take(3).forEach { bin ->
+                    val remaining = bin.remainingSeconds(state.totalElapsedSeconds)
+                    val urgent = remaining < 60L
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "SIN  #${bin.playerNumber} ${bin.team.take(5)}  %02d:%02d".format(
+                                remaining / 60, remaining % 60
+                            ),
+                            fontSize = 12.sp,
+                            fontWeight = if (urgent) FontWeight.Bold else FontWeight.Normal,
+                            color = if (urgent) RefRed else RefOrange
+                        )
+                    }
+                }
+                if (activeBins.size > 3) {
+                    Text(
+                        text = "+${activeBins.size - 3} more in sin bin",
+                        style = MaterialTheme.typography.caption2,
+                        color = Color.Gray
+                    )
+                }
             }
 
-            Spacer(modifier = Modifier.height(2.dp))
+            Spacer(modifier = Modifier.height(1.dp))
 
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 CompactChip(
@@ -151,7 +175,7 @@ fun MatchScreen(navController: NavController, viewModel: MatchViewModel) {
             }
         }
 
-        // Second yellow → red card alert overlay
+        // Second yellow alert overlay
         state.secondYellowAlert?.let { alert ->
             Box(
                 modifier = Modifier
@@ -174,37 +198,54 @@ fun MatchScreen(navController: NavController, viewModel: MatchViewModel) {
                         color = RefYellow,
                         textAlign = TextAlign.Center
                     )
+                    when (alert.rule) {
+                        SecondYellowRule.RED_CARD -> {
+                            Text(
+                                text = "AUTO RED CARD",
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = RefRed,
+                                textAlign = TextAlign.Center
+                            )
+                            Text(
+                                text = "Player dismissed",
+                                style = MaterialTheme.typography.caption2,
+                                color = Color.Gray,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                        SecondYellowRule.SIN_BIN -> {
+                            Text(
+                                text = "AUTO SIN BIN",
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = RefOrange,
+                                textAlign = TextAlign.Center
+                            )
+                            Text(
+                                text = "${state.sinBinMinutes} min sin bin",
+                                style = MaterialTheme.typography.caption2,
+                                color = Color.Gray,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
                     Text(
-                        text = "AUTO RED CARD",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = RefRed,
-                        textAlign = TextAlign.Center
-                    )
-                    Text(
-                        text = "#${alert.playerNumber}",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
+                        text = "#${alert.playerNumber}  ${alert.team}",
+                        style = MaterialTheme.typography.caption1,
                         color = Color.White,
                         textAlign = TextAlign.Center
                     )
-                    Text(
-                        text = alert.team,
-                        style = MaterialTheme.typography.caption1,
-                        color = Color.Gray,
-                        textAlign = TextAlign.Center
-                    )
-                    Text(
-                        text = "Player dismissed",
-                        style = MaterialTheme.typography.caption2,
-                        color = Color.Gray,
-                        textAlign = TextAlign.Center
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(2.dp))
                     Chip(
                         label = { Text("OK", fontWeight = FontWeight.Bold) },
                         onClick = { viewModel.dismissSecondYellowAlert() },
-                        colors = ChipDefaults.chipColors(backgroundColor = RefRed),
+                        colors = ChipDefaults.chipColors(
+                            backgroundColor = when (alert.rule) {
+                                SecondYellowRule.RED_CARD -> RefRed
+                                SecondYellowRule.SIN_BIN -> RefOrange
+                            }
+                        ),
                         modifier = Modifier.fillMaxWidth()
                     )
                 }

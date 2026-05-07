@@ -18,6 +18,7 @@ import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.material.*
 import com.refsix.wear.data.CardType
 import com.refsix.wear.data.Offences
+import com.refsix.wear.data.SecondYellowRule
 import com.refsix.wear.ui.theme.*
 import com.refsix.wear.viewmodel.MatchViewModel
 
@@ -114,18 +115,24 @@ fun CardScreen(viewModel: MatchViewModel, onCardRecorded: () -> Unit) {
             val yellows = state.playerYellowCount(selectedTeam!!, "$playerNumber")
             if (yellows >= 1) {
                 item {
+                    val (warningText, warningColor) = when (state.secondYellowRule) {
+                        SecondYellowRule.RED_CARD ->
+                            "2nd yellow — auto RED CARD" to RefRed
+                        SecondYellowRule.SIN_BIN ->
+                            "2nd yellow — auto SIN BIN (${state.sinBinMinutes}min)" to RefOrange
+                    }
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(6.dp))
-                            .background(Color(0xFF3A1A1A))
-                            .border(1.dp, RefRed, RoundedCornerShape(6.dp))
+                            .background(Color(0xFF2A1A00))
+                            .border(1.dp, warningColor, RoundedCornerShape(6.dp))
                             .padding(horizontal = 10.dp, vertical = 6.dp)
                     ) {
                         Text(
-                            text = "2nd yellow — auto RED CARD",
+                            text = warningText,
                             style = MaterialTheme.typography.caption2,
-                            color = RefRed,
+                            color = warningColor,
                             fontWeight = FontWeight.Bold
                         )
                     }
