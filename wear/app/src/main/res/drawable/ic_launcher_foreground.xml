@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Green circle background -->
+    <path
+        android:fillColor="#4CAF50"
+        android:pathData="M54,54m-40,0a40,40 0,1 1,80 0a40,40 0,1 1,-80 0" />
+    <!-- R6 text shape -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M30,38 L30,70 L38,70 L38,57 L46,70 L56,70 L46,55 Q52,52 52,44 Q52,38 44,38 Z
+                          M38,44 L43,44 Q45,44 45,47 Q45,50 43,50 L38,50 Z
+                          M60,38 L60,70 L78,70 L78,64 L68,64 L68,38 Z" />
+</vector>
