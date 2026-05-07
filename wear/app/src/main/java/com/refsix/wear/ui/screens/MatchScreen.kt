@@ -2,9 +2,11 @@ package com.refsix.wear.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -27,12 +29,12 @@ fun MatchScreen(navController: NavController, viewModel: MatchViewModel) {
             .background(Color.Black),
         contentAlignment = Alignment.Center
     ) {
+        // Main match content
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(4.dp),
             modifier = Modifier.padding(horizontal = 8.dp)
         ) {
-            // Half indicator
             Text(
                 text = when (state.phase) {
                     MatchPhase.FIRST_HALF -> "1ST HALF"
@@ -43,7 +45,6 @@ fun MatchScreen(navController: NavController, viewModel: MatchViewModel) {
                 color = Color.Gray
             )
 
-            // Timer
             Text(
                 text = "%02d:%02d".format(state.displayMinutes, state.displaySeconds),
                 fontSize = 36.sp,
@@ -51,7 +52,6 @@ fun MatchScreen(navController: NavController, viewModel: MatchViewModel) {
                 color = if (state.isRunning) Color.White else Color.Gray
             )
 
-            // Additional time
             if (state.isInAdditionalTime) {
                 Text(
                     text = "+%02d:%02d".format(
@@ -64,7 +64,6 @@ fun MatchScreen(navController: NavController, viewModel: MatchViewModel) {
                 )
             }
 
-            // Score
             Text(
                 text = "${state.homeScore}  –  ${state.awayScore}",
                 fontSize = 28.sp,
@@ -72,7 +71,6 @@ fun MatchScreen(navController: NavController, viewModel: MatchViewModel) {
                 color = Color.White
             )
 
-            // Team names
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
@@ -93,7 +91,6 @@ fun MatchScreen(navController: NavController, viewModel: MatchViewModel) {
                 )
             }
 
-            // Sin bin badge
             if (state.activeSinBins.isNotEmpty()) {
                 Text(
                     text = "[ ${state.activeSinBins.size} IN SIN BIN ]",
@@ -104,7 +101,6 @@ fun MatchScreen(navController: NavController, viewModel: MatchViewModel) {
 
             Spacer(modifier = Modifier.height(2.dp))
 
-            // Action row 1
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 CompactChip(
                     label = { Text("GOAL", fontWeight = FontWeight.Bold) },
@@ -123,7 +119,6 @@ fun MatchScreen(navController: NavController, viewModel: MatchViewModel) {
                 )
             }
 
-            // Action row 2
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 CompactChip(
                     label = {
@@ -153,6 +148,66 @@ fun MatchScreen(navController: NavController, viewModel: MatchViewModel) {
                     },
                     colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF9C27B0))
                 )
+            }
+        }
+
+        // Second yellow → red card alert overlay
+        state.secondYellowAlert?.let { alert ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(0xEE000000)),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xFF1A0000))
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                ) {
+                    Text(
+                        text = "2ND YELLOW",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = RefYellow,
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        text = "AUTO RED CARD",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = RefRed,
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        text = "#${alert.playerNumber}",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        text = alert.team,
+                        style = MaterialTheme.typography.caption1,
+                        color = Color.Gray,
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        text = "Player dismissed",
+                        style = MaterialTheme.typography.caption2,
+                        color = Color.Gray,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Chip(
+                        label = { Text("OK", fontWeight = FontWeight.Bold) },
+                        onClick = { viewModel.dismissSecondYellowAlert() },
+                        colors = ChipDefaults.chipColors(backgroundColor = RefRed),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
         }
     }

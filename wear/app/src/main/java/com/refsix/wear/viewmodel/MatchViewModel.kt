@@ -42,12 +42,13 @@ class MatchViewModel : ViewModel() {
         }
     }
 
-    fun updateSetup(homeTeam: String, awayTeam: String, halfLengthMinutes: Int) {
+    fun updateSetup(homeTeam: String, awayTeam: String, halfLengthMinutes: Int, ageGroup: AgeGroup) {
         _state.update {
             it.copy(
                 homeTeam = homeTeam.ifBlank { "Home" },
                 awayTeam = awayTeam.ifBlank { "Away" },
-                halfLengthMinutes = halfLengthMinutes.coerceIn(10, 60)
+                halfLengthMinutes = halfLengthMinutes.coerceIn(10, 60),
+                ageGroup = ageGroup
             )
         }
     }
@@ -63,7 +64,8 @@ class MatchViewModel : ViewModel() {
                 homeScore = 0,
                 awayScore = 0,
                 events = emptyList(),
-                sinBins = emptyList()
+                sinBins = emptyList(),
+                secondYellowAlert = null
             )
         }
     }
@@ -110,29 +112,59 @@ class MatchViewModel : ViewModel() {
 
     fun recordCard(team: String, playerNumber: String, cardType: CardType, offence: String) {
         _state.update { s ->
-            val eventType = when (cardType) {
-                CardType.YELLOW -> EventType.YELLOW_CARD
-                CardType.RED -> EventType.RED_CARD
-                CardType.SIN_BIN -> EventType.SIN_BIN
-            }
-            val event = MatchEvent(
-                type = eventType,
+            val minute = s.currentMatchMinute
+            val half = s.currentHalf
+
+            val isSecondYellow = cardType == CardType.YELLOW &&
+                s.playerYellowCount(team, playerNumber) >= 1
+
+            val cardEvent = MatchEvent(
+                type = when (cardType) {
+                    CardType.YELLOW -> EventType.YELLOW_CARD
+                    CardType.RED -> EventType.RED_CARD
+                    CardType.SIN_BIN -> EventType.SIN_BIN
+                },
                 team = team,
                 playerNumber = playerNumber,
                 detail = offence,
-                matchMinute = s.currentMatchMinute,
-                half = s.currentHalf
+                matchMinute = minute,
+                half = half
             )
+
+            val newEvents = if (isSecondYellow) {
+                val autoRed = MatchEvent(
+                    type = EventType.RED_CARD,
+                    team = team,
+                    playerNumber = playerNumber,
+                    detail = "Second caution",
+                    matchMinute = minute,
+                    half = half
+                )
+                s.events + cardEvent + autoRed
+            } else {
+                s.events + cardEvent
+            }
+
             val updatedSinBins = if (cardType == CardType.SIN_BIN) {
                 s.sinBins + SinBinEntry(
                     team = team,
                     playerNumber = playerNumber,
                     offence = offence,
-                    startElapsedSeconds = s.totalElapsedSeconds
+                    startElapsedSeconds = s.totalElapsedSeconds,
+                    durationSeconds = s.sinBinDurationSeconds
                 )
             } else s.sinBins
-            s.copy(events = s.events + event, sinBins = updatedSinBins)
+
+            s.copy(
+                events = newEvents,
+                sinBins = updatedSinBins,
+                secondYellowAlert = if (isSecondYellow) SecondYellowAlert(team, playerNumber) else s.secondYellowAlert
+            )
         }
+    }
+
+    fun dismissSecondYellowAlert() {
+        _state.update { it.copy(secondYellowAlert = null) }
     }
 
     fun returnFromSinBin(sinBinId: Long) {

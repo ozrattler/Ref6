@@ -109,6 +109,30 @@ fun CardScreen(viewModel: MatchViewModel, onCardRecorded: () -> Unit) {
             }
         }
 
+        // Second-yellow warning
+        if (selectedCard == CardType.YELLOW && selectedTeam != null) {
+            val yellows = state.playerYellowCount(selectedTeam!!, "$playerNumber")
+            if (yellows >= 1) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color(0xFF3A1A1A))
+                            .border(1.dp, RefRed, RoundedCornerShape(6.dp))
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = "2nd yellow — auto RED CARD",
+                            style = MaterialTheme.typography.caption2,
+                            color = RefRed,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
+
         // Step 4: Offence (show only when card type is selected)
         if (selectedCard != null) {
             item { SectionLabel("4. Offence") }

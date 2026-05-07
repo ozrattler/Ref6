@@ -6,6 +6,17 @@ enum class CardType { YELLOW, RED, SIN_BIN }
 
 enum class EventType { GOAL, YELLOW_CARD, RED_CARD, SIN_BIN }
 
+enum class AgeGroup(val label: String, val sinBinMinutes: Int) {
+    OPEN_SENIOR("Open/Senior", 10),
+    U18("U18", 10),
+    U16("U16", 5),
+    U14("U14", 5),
+    U12("U12", 5),
+    U10("U10", 5)
+}
+
+data class SecondYellowAlert(val team: String, val playerNumber: String)
+
 data class MatchEvent(
     val id: Long = System.currentTimeMillis(),
     val type: EventType,
@@ -34,6 +45,7 @@ data class MatchState(
     val homeTeam: String = "Home",
     val awayTeam: String = "Away",
     val halfLengthMinutes: Int = 45,
+    val ageGroup: AgeGroup = AgeGroup.OPEN_SENIOR,
     val homeScore: Int = 0,
     val awayScore: Int = 0,
     val currentHalf: Int = 1,
@@ -42,11 +54,13 @@ data class MatchState(
     val totalElapsedSeconds: Long = 0L,
     val phase: MatchPhase = MatchPhase.SETUP,
     val events: List<MatchEvent> = emptyList(),
-    val sinBins: List<SinBinEntry> = emptyList()
+    val sinBins: List<SinBinEntry> = emptyList(),
+    val secondYellowAlert: SecondYellowAlert? = null
 ) {
     val halfLengthSeconds: Long get() = halfLengthMinutes * 60L
     val isInAdditionalTime: Boolean get() = halfElapsedSeconds > halfLengthSeconds
     val additionalSeconds: Long get() = maxOf(0L, halfElapsedSeconds - halfLengthSeconds)
+    val sinBinDurationSeconds: Long get() = ageGroup.sinBinMinutes * 60L
 
     val displayMinutes: Int get() = when (phase) {
         MatchPhase.SECOND_HALF, MatchPhase.FULL_TIME ->
@@ -68,6 +82,9 @@ data class MatchState(
     val yellowCards: List<MatchEvent> get() = events.filter { it.type == EventType.YELLOW_CARD }
     val redCards: List<MatchEvent> get() = events.filter { it.type == EventType.RED_CARD }
     val sinBinEvents: List<MatchEvent> get() = events.filter { it.type == EventType.SIN_BIN }
+
+    fun playerYellowCount(team: String, playerNumber: String): Int =
+        events.count { it.type == EventType.YELLOW_CARD && it.team == team && it.playerNumber == playerNumber }
 }
 
 object Offences {
