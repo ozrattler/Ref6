@@ -18,16 +18,17 @@ import com.refsix.wear.viewmodel.MatchViewModel
 fun FullTimeScreen(viewModel: MatchViewModel, onNewMatch: () -> Unit) {
     val state by viewModel.state.collectAsState()
 
-    val allGoals = state.events.filter { it.type == EventType.GOAL }
-    val allYellows = state.events.filter { it.type == EventType.YELLOW_CARD }
-    val allReds = state.events.filter { it.type == EventType.RED_CARD }
-    val allSinBins = state.events.filter { it.type == EventType.SIN_BIN }
+    val allEvents = state.events.sortedBy { it.matchMinute }
+    val goalCount = allEvents.count { it.type == EventType.GOAL }
+    val yellowCount = allEvents.count { it.type == EventType.YELLOW_CARD }
+    val redCount = allEvents.count { it.type == EventType.RED_CARD }
+    val sinCount = allEvents.count { it.type == EventType.SIN_BIN }
 
     ScalingLazyColumn(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         item {
             Text(
@@ -48,75 +49,38 @@ fun FullTimeScreen(viewModel: MatchViewModel, onNewMatch: () -> Unit) {
         }
 
         item {
-            Row(horizontalArrangement = Arrangement.SpaceEvenly, modifier = Modifier.fillMaxWidth()) {
+            Row(
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                modifier = Modifier.fillMaxWidth()
+            ) {
                 Text(state.homeTeam, style = MaterialTheme.typography.caption1, color = Color.Gray)
                 Text(state.awayTeam, style = MaterialTheme.typography.caption1, color = Color.Gray)
             }
         }
 
-        // Stats summary row
         item {
             Row(
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                StatBadge("${allGoals.size}", "Goals", RefGreen)
-                StatBadge("${allYellows.size}", "Yellow", RefYellow)
-                StatBadge("${allReds.size}", "Red", RefRed)
-                StatBadge("${allSinBins.size}", "Sin", RefOrange)
+                StatBadge("$goalCount", "Goals", RefGreen)
+                StatBadge("$yellowCount", "YC", RefYellow)
+                StatBadge("$redCount", "RC", RefRed)
+                StatBadge("$sinCount", "SB", RefOrange)
             }
         }
 
-        if (allGoals.isNotEmpty()) {
-            item { ReportDivider("Goals") }
-            items(allGoals.size) { i ->
-                val g = allGoals[i]
-                ReportRow("${g.team.take(8)}  ${g.matchMinute}'  H${g.half}", RefGreen)
+        if (allEvents.isEmpty()) {
+            item {
+                Text(
+                    text = "No events",
+                    style = MaterialTheme.typography.caption2,
+                    color = Color.Gray
+                )
             }
-        }
-
-        if (allYellows.isNotEmpty()) {
-            item { ReportDivider("Yellow Cards") }
-            items(allYellows.size) { i ->
-                val c = allYellows[i]
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    ReportRow("#${c.playerNumber} ${c.team.take(6)}  ${c.matchMinute}'", RefYellow)
-                    Text(
-                        text = c.detail,
-                        style = MaterialTheme.typography.caption2,
-                        color = Color.Gray
-                    )
-                }
-            }
-        }
-
-        if (allReds.isNotEmpty()) {
-            item { ReportDivider("Red Cards") }
-            items(allReds.size) { i ->
-                val c = allReds[i]
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    ReportRow("#${c.playerNumber} ${c.team.take(6)}  ${c.matchMinute}'", RefRed)
-                    Text(
-                        text = c.detail,
-                        style = MaterialTheme.typography.caption2,
-                        color = Color.Gray
-                    )
-                }
-            }
-        }
-
-        if (allSinBins.isNotEmpty()) {
-            item { ReportDivider("Sin Bins") }
-            items(allSinBins.size) { i ->
-                val c = allSinBins[i]
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    ReportRow("#${c.playerNumber} ${c.team.take(6)}  ${c.matchMinute}'", RefOrange)
-                    Text(
-                        text = c.detail,
-                        style = MaterialTheme.typography.caption2,
-                        color = Color.Gray
-                    )
-                }
+        } else {
+            items(allEvents.size) { i ->
+                EventItem(allEvents[i])
             }
         }
 
@@ -142,24 +106,4 @@ private fun StatBadge(count: String, label: String, color: Color) {
         Text(text = count, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = color)
         Text(text = label, style = MaterialTheme.typography.caption2, color = Color.Gray)
     }
-}
-
-@Composable
-private fun ReportDivider(title: String) {
-    Text(
-        text = title,
-        style = MaterialTheme.typography.caption2,
-        color = Color.Gray,
-        modifier = Modifier.fillMaxWidth()
-    )
-}
-
-@Composable
-private fun ReportRow(text: String, color: Color) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.caption1,
-        color = color,
-        modifier = Modifier.fillMaxWidth()
-    )
 }

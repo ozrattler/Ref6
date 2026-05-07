@@ -11,6 +11,7 @@ import androidx.compose.ui.unit.sp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.material.*
 import com.refsix.wear.data.EventType
+import com.refsix.wear.data.MatchEvent
 import com.refsix.wear.ui.theme.*
 import com.refsix.wear.viewmodel.MatchViewModel
 
@@ -18,16 +19,15 @@ import com.refsix.wear.viewmodel.MatchViewModel
 fun HalfTimeScreen(viewModel: MatchViewModel, onStartSecondHalf: () -> Unit) {
     val state by viewModel.state.collectAsState()
 
-    val firstHalfGoals = state.events.filter { it.type == EventType.GOAL && it.half == 1 }
-    val firstHalfYellows = state.events.filter { it.type == EventType.YELLOW_CARD && it.half == 1 }
-    val firstHalfReds = state.events.filter { it.type == EventType.RED_CARD && it.half == 1 }
-    val firstHalfSinBins = state.events.filter { it.type == EventType.SIN_BIN && it.half == 1 }
+    val firstHalfEvents = state.events
+        .filter { it.half == 1 }
+        .sortedBy { it.matchMinute }
 
     ScalingLazyColumn(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         item {
             Text(
@@ -48,41 +48,26 @@ fun HalfTimeScreen(viewModel: MatchViewModel, onStartSecondHalf: () -> Unit) {
         }
 
         item {
-            Row(horizontalArrangement = Arrangement.SpaceEvenly, modifier = Modifier.fillMaxWidth()) {
+            Row(
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                modifier = Modifier.fillMaxWidth()
+            ) {
                 Text(state.homeTeam, style = MaterialTheme.typography.caption1, color = Color.Gray)
                 Text(state.awayTeam, style = MaterialTheme.typography.caption1, color = Color.Gray)
             }
         }
 
-        if (firstHalfGoals.isNotEmpty()) {
-            item { SummaryDivider("Goals") }
-            items(firstHalfGoals.size) { i ->
-                val g = firstHalfGoals[i]
-                EventRow(text = "${g.team.take(8)} ${g.matchMinute}'", color = RefGreen)
+        if (firstHalfEvents.isEmpty()) {
+            item {
+                Text(
+                    text = "No events",
+                    style = MaterialTheme.typography.caption2,
+                    color = Color.Gray
+                )
             }
-        }
-
-        if (firstHalfYellows.isNotEmpty()) {
-            item { SummaryDivider("Yellow Cards") }
-            items(firstHalfYellows.size) { i ->
-                val c = firstHalfYellows[i]
-                EventRow(text = "#${c.playerNumber} ${c.team.take(5)} ${c.matchMinute}'", color = RefYellow)
-            }
-        }
-
-        if (firstHalfReds.isNotEmpty()) {
-            item { SummaryDivider("Red Cards") }
-            items(firstHalfReds.size) { i ->
-                val c = firstHalfReds[i]
-                EventRow(text = "#${c.playerNumber} ${c.team.take(5)} ${c.matchMinute}'", color = RefRed)
-            }
-        }
-
-        if (firstHalfSinBins.isNotEmpty()) {
-            item { SummaryDivider("Sin Bins") }
-            items(firstHalfSinBins.size) { i ->
-                val c = firstHalfSinBins[i]
-                EventRow(text = "#${c.playerNumber} ${c.team.take(5)} ${c.matchMinute}'", color = RefOrange)
+        } else {
+            items(firstHalfEvents.size) { i ->
+                EventItem(firstHalfEvents[i])
             }
         }
 
@@ -103,21 +88,32 @@ fun HalfTimeScreen(viewModel: MatchViewModel, onStartSecondHalf: () -> Unit) {
 }
 
 @Composable
-private fun SummaryDivider(title: String) {
-    Text(
-        text = title,
-        style = MaterialTheme.typography.caption2,
-        color = Color.Gray,
-        modifier = Modifier.fillMaxWidth()
-    )
-}
-
-@Composable
-private fun EventRow(text: String, color: Color) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.caption1,
-        color = color,
-        modifier = Modifier.fillMaxWidth()
-    )
+internal fun EventItem(event: MatchEvent) {
+    val (abbrev, color) = when (event.type) {
+        EventType.GOAL -> "G" to RefGreen
+        EventType.YELLOW_CARD -> "YC" to RefYellow
+        EventType.RED_CARD -> "RC" to RefRed
+        EventType.SIN_BIN -> "SB" to RefOrange
+    }
+    Column(modifier = Modifier.fillMaxWidth()) {
+        val mainLine = if (event.type == EventType.GOAL) {
+            "${event.matchMinute}'  G  ${event.team}"
+        } else {
+            "${event.matchMinute}'  $abbrev  #${event.playerNumber}  ${event.team.take(5)}"
+        }
+        Text(
+            text = mainLine,
+            style = MaterialTheme.typography.caption1,
+            color = color,
+            modifier = Modifier.fillMaxWidth()
+        )
+        if (event.detail.isNotEmpty()) {
+            Text(
+                text = event.detail,
+                style = MaterialTheme.typography.caption2,
+                color = Color.Gray,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
 }

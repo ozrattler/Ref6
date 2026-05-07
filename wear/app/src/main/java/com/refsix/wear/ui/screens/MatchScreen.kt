@@ -51,15 +51,15 @@ fun MatchScreen(navController: NavController, viewModel: MatchViewModel) {
         ) { page ->
             when (page) {
                 0 -> TeamActionPage(
-                    team = state.awayTeam,
-                    teamKey = "away",
+                    team = state.homeTeam,
+                    teamKey = "home",
                     viewModel = viewModel,
                     navController = navController
                 )
                 1 -> MainMatchPage(state = state, viewModel = viewModel, navController = navController)
                 2 -> TeamActionPage(
-                    team = state.homeTeam,
-                    teamKey = "home",
+                    team = state.awayTeam,
+                    teamKey = "away",
                     viewModel = viewModel,
                     navController = navController
                 )
