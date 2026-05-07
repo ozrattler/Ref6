@@ -34,6 +34,10 @@ class MatchStorage(context: Context) {
         }
     }
 
+    fun clearHistory() {
+        prefs.edit().clear().apply()
+    }
+
     companion object {
         private const val MAX_MATCHES = 3
     }

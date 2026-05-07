@@ -103,7 +103,8 @@ internal fun EventItem(
     }
     Column(modifier = Modifier.fillMaxWidth()) {
         val mainLine = if (event.type == EventType.GOAL) {
-            "${event.matchMinute}'  G  ${event.team}"
+            val scorer = if (event.scorerNumber.isNotEmpty()) " #${event.scorerNumber}" else ""
+            "${event.matchMinute}'  G$scorer  ${event.team}"
         } else {
             "${event.matchMinute}'  $abbrev  #${event.playerNumber}  ${event.team.take(5)}"
         }
@@ -114,6 +115,14 @@ internal fun EventItem(
             color = color,
             modifier = Modifier.fillMaxWidth()
         )
+        if (event.scorerName.isNotEmpty()) {
+            Text(
+                text = event.scorerName,
+                fontSize = detailFontSp.sp,
+                color = RefGreen.copy(alpha = 0.8f),
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
         if (event.detail.isNotEmpty()) {
             Text(
                 text = event.detail,

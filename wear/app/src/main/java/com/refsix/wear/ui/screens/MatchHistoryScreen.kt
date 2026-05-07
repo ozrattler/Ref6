@@ -65,6 +65,18 @@ fun MatchHistoryScreen(viewModel: MatchViewModel, navController: NavController) 
                     modifier = Modifier.fillMaxWidth()
                 )
             }
+
+            item {
+                Spacer(modifier = Modifier.height(4.dp))
+            }
+
+            item {
+                CompactChip(
+                    label = { Text("Clear History", fontWeight = FontWeight.Bold) },
+                    onClick = { viewModel.clearHistory() },
+                    colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF5C0000))
+                )
+            }
         }
     }
 }

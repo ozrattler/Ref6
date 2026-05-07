@@ -75,6 +75,14 @@ class MainActivity : ComponentActivity() {
                                     )
                                 )
                             }
+                            is MatchUiEvent.FullTimeAlert -> {
+                                vibrator?.vibrate(
+                                    VibrationEffect.createWaveform(
+                                        longArrayOf(0, 600, 150, 600, 150, 600, 150, 600),
+                                        -1
+                                    )
+                                )
+                            }
                         }
                     }
                 }
@@ -134,6 +142,22 @@ class MainActivity : ComponentActivity() {
                             teamKey = entry.arguments?.getString("teamKey"),
                             cardTypeKey = entry.arguments?.getString("cardTypeKey"),
                             onCardRecorded = {
+                                navController.popBackStack()
+                                matchViewModel.signalReturnToCenter()
+                            }
+                        )
+                    }
+
+                    composable(
+                        route = "goalScorer/{teamKey}",
+                        arguments = listOf(
+                            navArgument("teamKey") { type = NavType.StringType }
+                        )
+                    ) { entry ->
+                        GoalScorerScreen(
+                            viewModel = matchViewModel,
+                            teamKey = entry.arguments?.getString("teamKey") ?: "home",
+                            onDone = {
                                 navController.popBackStack()
                                 matchViewModel.signalReturnToCenter()
                             }

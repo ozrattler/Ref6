@@ -31,10 +31,9 @@ import kotlinx.coroutines.delay
 fun MatchScreen(navController: NavController, viewModel: MatchViewModel) {
     val state by viewModel.state.collectAsState()
     val pagerState = rememberPagerState(initialPage = 1) { 3 }
-    LaunchedEffect(Unit) {
-        viewModel.returnToCenter.collect {
-            pagerState.animateScrollToPage(1)
-        }
+    val centerCount by viewModel.returnToCenterCount.collectAsState()
+    LaunchedEffect(centerCount) {
+        if (centerCount > 0) pagerState.animateScrollToPage(1)
     }
 
     val indicatorState = remember(pagerState) {
@@ -307,6 +306,7 @@ private fun TeamActionPage(
     viewModel: MatchViewModel,
     navController: NavController
 ) {
+    val state by viewModel.state.collectAsState()
     var goalFlash by remember { mutableStateOf(false) }
     LaunchedEffect(goalFlash) {
         if (goalFlash) {
@@ -347,8 +347,12 @@ private fun TeamActionPage(
                     )
                 },
                 onClick = {
-                    viewModel.recordGoal(team)
-                    goalFlash = true
+                    if (state.isSpl) {
+                        navController.navigate("goalScorer/$teamKey")
+                    } else {
+                        viewModel.recordGoal(team)
+                        goalFlash = true
+                    }
                 },
                 colors = ChipDefaults.chipColors(
                     backgroundColor = if (goalFlash) Color(0xFF1B5E20) else Color(0xFF2E7D32)

@@ -6,13 +6,18 @@ enum class CardType { YELLOW, RED, SIN_BIN }
 
 enum class EventType { GOAL, YELLOW_CARD, RED_CARD, SIN_BIN }
 
-enum class AgeGroup(val label: String, val sinBinMinutes: Int) {
-    OPEN_SENIOR("Open/Senior", 10),
-    U18("U18", 10),
-    U16("U16", 5),
-    U14("U14", 5),
-    U12("U12", 5),
-    U10("U10", 5)
+enum class AgeGroup(val label: String, val sinBinMinutes: Int, val defaultHalfMinutes: Int) {
+    OPEN_SENIOR("Open/Senior", 10, 45),
+    U18("U18", 10, 45),
+    U16("U16", 5, 35),
+    U15("U15", 5, 35),
+    U14("U14", 5, 30),
+    U12("U12", 5, 25)
+}
+
+enum class CompetitionType(val label: String) {
+    STANDARD("Standard"),
+    SPL("SPL")
 }
 
 enum class CardAlertType {
@@ -34,7 +39,9 @@ data class MatchEvent(
     val playerNumber: String = "",
     val detail: String = "",
     val matchMinute: Int,
-    val half: Int
+    val half: Int,
+    val scorerNumber: String = "",
+    val scorerName: String = ""
 )
 
 data class SinBinEntry(
@@ -56,9 +63,8 @@ data class MatchState(
     val awayTeam: String = "Away",
     val halfLengthMinutes: Int = 45,
     val ageGroup: AgeGroup = AgeGroup.OPEN_SENIOR,
+    val competitionType: CompetitionType = CompetitionType.STANDARD,
     val sinBinMinutes: Int = 10,
-    // Default: dissent automatically triggers a sin bin in addition to the caution
-    val dissentAutoSinBin: Boolean = true,
     val homeScore: Int = 0,
     val awayScore: Int = 0,
     val currentHalf: Int = 1,
@@ -70,7 +76,9 @@ data class MatchState(
     val sinBins: List<SinBinEntry> = emptyList(),
     val cardAlert: CardAlert? = null
 ) {
+    val isSpl: Boolean get() = competitionType == CompetitionType.SPL
     val halfLengthSeconds: Long get() = halfLengthMinutes * 60L
+    val halfRemainingSeconds: Long get() = maxOf(0L, halfLengthSeconds - halfElapsedSeconds)
     val isInAdditionalTime: Boolean get() = halfElapsedSeconds > halfLengthSeconds
     val additionalSeconds: Long get() = maxOf(0L, halfElapsedSeconds - halfLengthSeconds)
     val sinBinDurationSeconds: Long get() = sinBinMinutes * 60L

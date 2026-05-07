@@ -30,6 +30,8 @@ data class SavedMatch(
                     put("detail", e.detail)
                     put("matchMinute", e.matchMinute)
                     put("half", e.half)
+                    put("scorerNumber", e.scorerNumber)
+                    put("scorerName", e.scorerName)
                 })
             }
         })
@@ -47,7 +49,9 @@ data class SavedMatch(
                     playerNumber = e.optString("playerNumber", ""),
                     detail = e.optString("detail", ""),
                     matchMinute = e.getInt("matchMinute"),
-                    half = e.getInt("half")
+                    half = e.getInt("half"),
+                    scorerNumber = e.optString("scorerNumber", ""),
+                    scorerName = e.optString("scorerName", "")
                 )
             }
             return SavedMatch(

@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.sp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.material.*
 import com.refsix.wear.data.AgeGroup
+import com.refsix.wear.data.CompetitionType
 import com.refsix.wear.ui.theme.*
 import com.refsix.wear.viewmodel.MatchViewModel
 
@@ -32,6 +33,8 @@ fun SetupScreen(viewModel: MatchViewModel, onStartMatch: () -> Unit, onShowHisto
     var halfLength by remember { mutableIntStateOf(state.halfLengthMinutes) }
     var ageGroup by remember { mutableStateOf(state.ageGroup) }
     var sinBinMinutes by remember { mutableIntStateOf(state.sinBinMinutes) }
+    var competitionType by remember { mutableStateOf(state.competitionType) }
+
     ScalingLazyColumn(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -60,8 +63,26 @@ fun SetupScreen(viewModel: MatchViewModel, onStartMatch: () -> Unit, onShowHisto
                 onSelect = { group ->
                     ageGroup = group
                     sinBinMinutes = group.sinBinMinutes
+                    halfLength = group.defaultHalfMinutes
                 }
             )
+        }
+
+        item { FieldLabel("Competition") }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                CompetitionChip(
+                    label = "Standard",
+                    selected = competitionType == CompetitionType.STANDARD,
+                    onClick = { competitionType = CompetitionType.STANDARD }
+                )
+                CompetitionChip(
+                    label = "SPL",
+                    selected = competitionType == CompetitionType.SPL,
+                    activeColor = Color(0xFF1565C0),
+                    onClick = { competitionType = CompetitionType.SPL }
+                )
+            }
         }
 
         item { FieldLabel("Half Length") }
@@ -90,7 +111,7 @@ fun SetupScreen(viewModel: MatchViewModel, onStartMatch: () -> Unit, onShowHisto
             Chip(
                 label = { Text("START MATCH", fontWeight = FontWeight.Bold) },
                 onClick = {
-                    viewModel.updateSetup(homeTeam, awayTeam, halfLength, ageGroup, sinBinMinutes)
+                    viewModel.updateSetup(homeTeam, awayTeam, halfLength, ageGroup, sinBinMinutes, competitionType)
                     viewModel.startMatch()
                     onStartMatch()
                 },
@@ -188,6 +209,23 @@ private fun AgeGroupChip(label: String, selected: Boolean, onClick: () -> Unit, 
             textAlign = TextAlign.Center
         )
     }
+}
+
+@Composable
+private fun CompetitionChip(
+    label: String,
+    selected: Boolean,
+    activeColor: Color = RefGreen,
+    onClick: () -> Unit
+) {
+    CompactChip(
+        label = { Text(label, fontWeight = FontWeight.Bold) },
+        onClick = onClick,
+        colors = if (selected)
+            ChipDefaults.chipColors(backgroundColor = activeColor)
+        else
+            ChipDefaults.chipColors(backgroundColor = Color(0xFF333333))
+    )
 }
 
 @Composable
