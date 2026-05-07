@@ -31,6 +31,14 @@ import kotlinx.coroutines.delay
 fun MatchScreen(navController: NavController, viewModel: MatchViewModel) {
     val state by viewModel.state.collectAsState()
     val pagerState = rememberPagerState(initialPage = 1) { 3 }
+    val returnToCenter by viewModel.returnToCenter.collectAsState()
+
+    LaunchedEffect(returnToCenter) {
+        if (returnToCenter) {
+            viewModel.consumeReturnToCenter()
+            pagerState.animateScrollToPage(1)
+        }
+    }
 
     val indicatorState = remember(pagerState) {
         object : PageIndicatorState {
@@ -160,8 +168,11 @@ private fun MainMatchPage(
             )
 
             Text(
-                text = "%02d:%02d".format(state.displayMinutes, state.displaySeconds),
-                fontSize = 34.sp,
+                text = "%02d:%02d".format(
+                    state.halfRemainingSeconds / 60,
+                    state.halfRemainingSeconds % 60
+                ),
+                fontSize = 30.sp,
                 fontWeight = FontWeight.Bold,
                 color = if (state.isRunning) Color.White else Color.Gray
             )
@@ -172,11 +183,17 @@ private fun MainMatchPage(
                         state.additionalSeconds / 60,
                         state.additionalSeconds % 60
                     ),
-                    fontSize = 13.sp,
+                    fontSize = 12.sp,
                     color = RefYellow,
                     fontWeight = FontWeight.Bold
                 )
             }
+
+            Text(
+                text = "%02d:%02d".format(state.displayMinutes, state.displaySeconds),
+                fontSize = 12.sp,
+                color = Color.Gray
+            )
 
             Text(
                 text = "${state.homeScore}  –  ${state.awayScore}",
@@ -298,6 +315,7 @@ private fun TeamActionPage(
         if (goalFlash) {
             delay(900)
             goalFlash = false
+            viewModel.signalReturnToCenter()
         }
     }
 

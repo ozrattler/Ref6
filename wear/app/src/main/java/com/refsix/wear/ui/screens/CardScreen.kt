@@ -53,7 +53,6 @@ fun CardScreen(
 
     val isDissentSelected = selectedCard == CardType.YELLOW &&
         selectedOffence == Offences.DISSENT &&
-        state.dissentAutoSinBin &&
         !isSecondYellow
 
     ScalingLazyColumn(
@@ -164,7 +163,6 @@ fun CardScreen(
                 val isSelected = selectedOffence == offence
                 val isDissent = offence == Offences.DISSENT &&
                     selectedCard == CardType.YELLOW &&
-                    state.dissentAutoSinBin &&
                     !isSecondYellow
 
                 val borderColor = when {

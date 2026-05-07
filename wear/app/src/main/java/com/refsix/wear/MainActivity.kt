@@ -115,7 +115,10 @@ class MainActivity : ComponentActivity() {
                     composable("card") {
                         CardScreen(
                             viewModel = matchViewModel,
-                            onCardRecorded = { navController.popBackStack() }
+                            onCardRecorded = {
+                                navController.popBackStack()
+                                matchViewModel.signalReturnToCenter()
+                            }
                         )
                     }
 
@@ -130,7 +133,10 @@ class MainActivity : ComponentActivity() {
                             viewModel = matchViewModel,
                             teamKey = entry.arguments?.getString("teamKey"),
                             cardTypeKey = entry.arguments?.getString("cardTypeKey"),
-                            onCardRecorded = { navController.popBackStack() }
+                            onCardRecorded = {
+                                navController.popBackStack()
+                                matchViewModel.signalReturnToCenter()
+                            }
                         )
                     }
 

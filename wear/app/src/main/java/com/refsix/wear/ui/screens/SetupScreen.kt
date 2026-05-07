@@ -32,8 +32,6 @@ fun SetupScreen(viewModel: MatchViewModel, onStartMatch: () -> Unit, onShowHisto
     var halfLength by remember { mutableIntStateOf(state.halfLengthMinutes) }
     var ageGroup by remember { mutableStateOf(state.ageGroup) }
     var sinBinMinutes by remember { mutableIntStateOf(state.sinBinMinutes) }
-    var dissentAutoSinBin by remember { mutableStateOf(state.dissentAutoSinBin) }
-
     ScalingLazyColumn(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -86,31 +84,13 @@ fun SetupScreen(viewModel: MatchViewModel, onStartMatch: () -> Unit, onShowHisto
             )
         }
 
-        item { FieldLabel("Dissent Rule") }
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                RuleChip(
-                    label = "Auto Sin Bin",
-                    selected = dissentAutoSinBin,
-                    activeColor = RefOrange,
-                    onClick = { dissentAutoSinBin = true }
-                )
-                RuleChip(
-                    label = "Yellow Only",
-                    selected = !dissentAutoSinBin,
-                    activeColor = Color(0xFF555555),
-                    onClick = { dissentAutoSinBin = false }
-                )
-            }
-        }
-
         item { Spacer(modifier = Modifier.height(4.dp)) }
 
         item {
             Chip(
                 label = { Text("START MATCH", fontWeight = FontWeight.Bold) },
                 onClick = {
-                    viewModel.updateSetup(homeTeam, awayTeam, halfLength, ageGroup, sinBinMinutes, dissentAutoSinBin)
+                    viewModel.updateSetup(homeTeam, awayTeam, halfLength, ageGroup, sinBinMinutes)
                     viewModel.startMatch()
                     onStartMatch()
                 },
@@ -208,18 +188,6 @@ private fun AgeGroupChip(label: String, selected: Boolean, onClick: () -> Unit, 
             textAlign = TextAlign.Center
         )
     }
-}
-
-@Composable
-private fun RuleChip(label: String, selected: Boolean, activeColor: Color, onClick: () -> Unit) {
-    CompactChip(
-        label = { Text(label, fontWeight = FontWeight.Bold) },
-        onClick = onClick,
-        colors = if (selected)
-            ChipDefaults.chipColors(backgroundColor = activeColor)
-        else
-            ChipDefaults.chipColors(backgroundColor = Color(0xFF333333))
-    )
 }
 
 @Composable
