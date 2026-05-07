@@ -47,6 +47,7 @@ class PocketBaseSync(private val context: Context) {
             match.events.forEach { event ->
                 val incidentBody = JSONObject().apply {
                     put("match_id", pbMatchId)
+                    put("half", event.half)
                     put("minute", event.matchMinute)
                     put("type", event.type.name)
                     put("team", event.team)
