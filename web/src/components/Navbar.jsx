@@ -10,6 +10,9 @@ export default function Navbar() {
         <NavLink to="/" className="nav-logo">Ref6</NavLink>
         <div className="nav-links">
           <NavLink to="/" end className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
+            Fixtures
+          </NavLink>
+          <NavLink to="/history" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
             History
           </NavLink>
           <NavLink to="/setup" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>

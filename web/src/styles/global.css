@@ -689,6 +689,154 @@ body {
 .form-input[type="date"],
 .form-input[type="time"] { color-scheme: dark; }
 
+/* ── Fixture cards ── */
+.fixture-day-group { margin-bottom: 28px; }
+.fixture-day-header {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--muted);
+  padding: 0 2px 8px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 10px;
+}
+.fixture-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  transition: background .15s;
+  border: 1px solid var(--border);
+}
+.fixture-card:hover { background: var(--surface-hover); }
+.fixture-card-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.fixture-competition {
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-weight: 500;
+}
+.fixture-kotime {
+  font-size: 0.82rem;
+  color: var(--muted);
+  margin-left: auto;
+}
+.fixture-countdown {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.cd-past    { background: rgba(239,68,68,.2);   color: #fca5a5; }
+.cd-urgent  { background: rgba(234,179,8,.2);   color: #fde68a; }
+.cd-soon    { background: rgba(34,197,94,.18);  color: #86efac; }
+.cd-future  { background: rgba(99,102,241,.18); color: #a5b4fc; }
+
+.fixture-teams {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.fixture-team-block {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+.fixture-team-block-away {
+  flex-direction: row-reverse;
+  text-align: right;
+}
+.fixture-team-name {
+  font-size: 1rem;
+  font-weight: 700;
+}
+.fixture-vs {
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.fixture-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.fixture-venue {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.fixture-official {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+/* ── Detail toolbar (back + edit) ── */
+.detail-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.detail-toolbar-actions { display: flex; gap: 8px; }
+.btn-edit {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 6px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  cursor: pointer;
+  font-family: var(--font);
+  transition: background .15s;
+}
+.btn-edit:hover { background: var(--surface-hover); }
+.btn-delete {
+  background: none;
+  border: 1px solid rgba(239,68,68,.4);
+  color: #fca5a5;
+  padding: 6px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  cursor: pointer;
+  font-family: var(--font);
+  transition: background .15s;
+}
+.btn-delete:hover { background: rgba(239,68,68,.1); }
+.btn-delete:disabled { opacity: .5; cursor: not-allowed; }
+
+/* ── Edit form ── */
+.edit-form-wrap { }
+.edit-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 16px;
+}
+.edit-actions .btn-ghost { flex-shrink: 0; }
+.edit-actions .btn-submit { flex: 1; }
+
+/* ── Fixture detail ── */
+.fixture-vs-badge {
+  font-size: 0.85rem !important;
+  color: var(--muted) !important;
+  font-weight: 600;
+}
+.fixture-rules-section {
+  margin-top: 16px;
+}
+
 /* ── Responsive ── */
 @media (max-width: 480px) {
   .teams-row       { flex-direction: column; gap: 0; }
