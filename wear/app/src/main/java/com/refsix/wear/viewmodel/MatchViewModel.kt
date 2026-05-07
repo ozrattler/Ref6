@@ -2,7 +2,16 @@ package com.refsix.wear.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.refsix.wear.data.*
+import com.refsix.wear.data.AgeGroup
+import com.refsix.wear.data.CardAlert
+import com.refsix.wear.data.CardAlertType
+import com.refsix.wear.data.CardType
+import com.refsix.wear.data.EventType
+import com.refsix.wear.data.MatchEvent
+import com.refsix.wear.data.MatchPhase
+import com.refsix.wear.data.MatchState
+import com.refsix.wear.data.Offences
+import com.refsix.wear.data.SinBinEntry
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -65,7 +74,6 @@ class MatchViewModel : ViewModel() {
         halfLengthMinutes: Int,
         ageGroup: AgeGroup,
         sinBinMinutes: Int,
-        secondYellowRule: SecondYellowRule,
         dissentAutoSinBin: Boolean
     ) {
         _state.update {
@@ -75,7 +83,6 @@ class MatchViewModel : ViewModel() {
                 halfLengthMinutes = halfLengthMinutes.coerceIn(10, 60),
                 ageGroup = ageGroup,
                 sinBinMinutes = sinBinMinutes.coerceIn(1, 30),
-                secondYellowRule = secondYellowRule,
                 dissentAutoSinBin = dissentAutoSinBin
             )
         }
@@ -175,34 +182,21 @@ class MatchViewModel : ViewModel() {
                     alert = s.cardAlert
                 }
 
-                // 2nd yellow — ALWAYS takes priority over any offence-specific rule
-                isSecondYellow -> when (s.secondYellowRule) {
-                    SecondYellowRule.RED_CARD -> {
-                        val autoRed = MatchEvent(
-                            type = EventType.RED_CARD,
-                            team = team,
-                            playerNumber = playerNumber,
-                            detail = "Second caution",
-                            matchMinute = minute,
-                            half = half
-                        )
-                        newEvents = s.events + cardEvent + autoRed
-                        updatedSinBins = s.sinBins.filterNot {
-                            it.team == team && it.playerNumber == playerNumber
-                        }
-                        alert = CardAlert(team, playerNumber, CardAlertType.SECOND_YELLOW_RED, s.sinBinMinutes)
+                // 2nd yellow always means red card and dismissal — no exceptions
+                isSecondYellow -> {
+                    val autoRed = MatchEvent(
+                        type = EventType.RED_CARD,
+                        team = team,
+                        playerNumber = playerNumber,
+                        detail = "Second caution",
+                        matchMinute = minute,
+                        half = half
+                    )
+                    newEvents = s.events + cardEvent + autoRed
+                    updatedSinBins = s.sinBins.filterNot {
+                        it.team == team && it.playerNumber == playerNumber
                     }
-                    SecondYellowRule.SIN_BIN -> {
-                        newEvents = s.events + cardEvent
-                        updatedSinBins = s.sinBins + SinBinEntry(
-                            team = team,
-                            playerNumber = playerNumber,
-                            offence = "Second caution",
-                            startElapsedSeconds = s.totalElapsedSeconds,
-                            durationSeconds = s.sinBinDurationSeconds
-                        )
-                        alert = CardAlert(team, playerNumber, CardAlertType.SECOND_YELLOW_SIN_BIN, s.sinBinMinutes)
-                    }
+                    alert = CardAlert(team, playerNumber, CardAlertType.SECOND_YELLOW_RED, s.sinBinMinutes)
                 }
 
                 // Dissent yellow (first caution only — 2nd yellow already handled above)

@@ -20,7 +20,6 @@ import androidx.compose.ui.unit.sp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.material.*
 import com.refsix.wear.data.AgeGroup
-import com.refsix.wear.data.SecondYellowRule
 import com.refsix.wear.ui.theme.*
 import com.refsix.wear.viewmodel.MatchViewModel
 
@@ -33,7 +32,6 @@ fun SetupScreen(viewModel: MatchViewModel, onStartMatch: () -> Unit) {
     var halfLength by remember { mutableIntStateOf(state.halfLengthMinutes) }
     var ageGroup by remember { mutableStateOf(state.ageGroup) }
     var sinBinMinutes by remember { mutableIntStateOf(state.sinBinMinutes) }
-    var secondYellowRule by remember { mutableStateOf(state.secondYellowRule) }
     var dissentAutoSinBin by remember { mutableStateOf(state.dissentAutoSinBin) }
 
     ScalingLazyColumn(
@@ -88,24 +86,6 @@ fun SetupScreen(viewModel: MatchViewModel, onStartMatch: () -> Unit) {
             )
         }
 
-        item { FieldLabel("2nd Yellow Rule") }
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                RuleChip(
-                    label = "Sin Bin",
-                    selected = secondYellowRule == SecondYellowRule.SIN_BIN,
-                    activeColor = RefOrange,
-                    onClick = { secondYellowRule = SecondYellowRule.SIN_BIN }
-                )
-                RuleChip(
-                    label = "Red Card",
-                    selected = secondYellowRule == SecondYellowRule.RED_CARD,
-                    activeColor = RefRed,
-                    onClick = { secondYellowRule = SecondYellowRule.RED_CARD }
-                )
-            }
-        }
-
         item { FieldLabel("Dissent Rule") }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -130,7 +110,7 @@ fun SetupScreen(viewModel: MatchViewModel, onStartMatch: () -> Unit) {
             Chip(
                 label = { Text("START MATCH", fontWeight = FontWeight.Bold) },
                 onClick = {
-                    viewModel.updateSetup(homeTeam, awayTeam, halfLength, ageGroup, sinBinMinutes, secondYellowRule, dissentAutoSinBin)
+                    viewModel.updateSetup(homeTeam, awayTeam, halfLength, ageGroup, sinBinMinutes, dissentAutoSinBin)
                     viewModel.startMatch()
                     onStartMatch()
                 },

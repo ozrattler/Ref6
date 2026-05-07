@@ -1,9 +1,12 @@
+@file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+
 package com.refsix.wear.ui.screens
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -19,12 +22,121 @@ import androidx.navigation.NavController
 import androidx.wear.compose.material.*
 import com.refsix.wear.data.CardAlertType
 import com.refsix.wear.data.MatchPhase
+import com.refsix.wear.data.MatchState
 import com.refsix.wear.ui.theme.*
 import com.refsix.wear.viewmodel.MatchViewModel
+import kotlinx.coroutines.delay
 
 @Composable
 fun MatchScreen(navController: NavController, viewModel: MatchViewModel) {
     val state by viewModel.state.collectAsState()
+    val pagerState = rememberPagerState(initialPage = 1) { 3 }
+
+    val indicatorState = remember(pagerState) {
+        object : PageIndicatorState {
+            override val pageCount: Int get() = 3
+            override val pageOffset: Float get() = pagerState.currentPageOffsetFraction
+            override val selectedPage: Int get() = pagerState.currentPage
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+    ) {
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxSize()
+        ) { page ->
+            when (page) {
+                0 -> TeamActionPage(
+                    team = state.awayTeam,
+                    teamKey = "away",
+                    viewModel = viewModel,
+                    navController = navController
+                )
+                1 -> MainMatchPage(state = state, viewModel = viewModel, navController = navController)
+                2 -> TeamActionPage(
+                    team = state.homeTeam,
+                    teamKey = "home",
+                    viewModel = viewModel,
+                    navController = navController
+                )
+            }
+        }
+
+        HorizontalPageIndicator(
+            pageIndicatorState = indicatorState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 6.dp)
+        )
+
+        // Card alert overlay
+        state.cardAlert?.let { alert ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(0xEE000000)),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xFF1A0000))
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                ) {
+                    when (alert.type) {
+                        CardAlertType.SECOND_YELLOW_RED -> {
+                            Text("2ND YELLOW", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = RefYellow, textAlign = TextAlign.Center)
+                            Text("AUTO RED CARD", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = RefRed, textAlign = TextAlign.Center)
+                            Text("Player dismissed", style = MaterialTheme.typography.caption2, color = Color.Gray, textAlign = TextAlign.Center)
+                        }
+                        CardAlertType.DISSENT_SIN_BIN -> {
+                            Text("DISSENT", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = RefYellow, textAlign = TextAlign.Center)
+                            Text("AUTO SIN BIN", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = RefOrange, textAlign = TextAlign.Center)
+                            Text("${alert.sinBinMinutes} min", style = MaterialTheme.typography.caption2, color = Color.Gray, textAlign = TextAlign.Center)
+                        }
+                    }
+                    Text(
+                        text = "#${alert.playerNumber}  ${alert.team}",
+                        style = MaterialTheme.typography.caption1,
+                        color = Color.White,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Chip(
+                        label = { Text("OK", fontWeight = FontWeight.Bold) },
+                        onClick = { viewModel.dismissCardAlert() },
+                        colors = ChipDefaults.chipColors(
+                            backgroundColor = when (alert.type) {
+                                CardAlertType.SECOND_YELLOW_RED -> RefRed
+                                else -> RefOrange
+                            }
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MainMatchPage(
+    state: MatchState,
+    viewModel: MatchViewModel,
+    navController: NavController
+) {
+    val homeBins = state.activeSinBins
+        .filter { it.team == state.homeTeam }
+        .sortedBy { it.remainingSeconds(state.totalElapsedSeconds) }
+    val awayBins = state.activeSinBins
+        .filter { it.team == state.awayTeam }
+        .sortedBy { it.remainingSeconds(state.totalElapsedSeconds) }
 
     Box(
         modifier = Modifier
@@ -34,7 +146,7 @@ fun MatchScreen(navController: NavController, viewModel: MatchViewModel) {
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(3.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
             modifier = Modifier.padding(horizontal = 8.dp)
         ) {
             Text(
@@ -49,7 +161,7 @@ fun MatchScreen(navController: NavController, viewModel: MatchViewModel) {
 
             Text(
                 text = "%02d:%02d".format(state.displayMinutes, state.displaySeconds),
-                fontSize = 36.sp,
+                fontSize = 34.sp,
                 fontWeight = FontWeight.Bold,
                 color = if (state.isRunning) Color.White else Color.Gray
             )
@@ -60,7 +172,7 @@ fun MatchScreen(navController: NavController, viewModel: MatchViewModel) {
                         state.additionalSeconds / 60,
                         state.additionalSeconds % 60
                     ),
-                    fontSize = 14.sp,
+                    fontSize = 13.sp,
                     color = RefYellow,
                     fontWeight = FontWeight.Bold
                 )
@@ -68,7 +180,7 @@ fun MatchScreen(navController: NavController, viewModel: MatchViewModel) {
 
             Text(
                 text = "${state.homeScore}  –  ${state.awayScore}",
-                fontSize = 28.sp,
+                fontSize = 26.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.White
             )
@@ -93,52 +205,52 @@ fun MatchScreen(navController: NavController, viewModel: MatchViewModel) {
                 )
             }
 
-            // Sin bin countdowns — single scrollable row, sorted most urgent first
-            val activeBins = state.activeSinBins
-                .sortedBy { it.remainingSeconds(state.totalElapsedSeconds) }
-            if (activeBins.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(1.dp))
+            // Sin bins: home on left, away on right — tap to manage
+            if (homeBins.isNotEmpty() || awayBins.isNotEmpty()) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .clickable { navController.navigate("sinBin") }
+                        .padding(vertical = 2.dp),
+                    verticalAlignment = Alignment.Top
                 ) {
-                    activeBins.forEach { bin ->
-                        val remaining = bin.remainingSeconds(state.totalElapsedSeconds)
-                        val urgent = remaining < 60L
-                        Text(
-                            text = "#${bin.playerNumber} %02d:%02d".format(
-                                remaining / 60, remaining % 60
-                            ),
-                            fontSize = 11.sp,
-                            fontWeight = if (urgent) FontWeight.Bold else FontWeight.Normal,
-                            color = if (urgent) RefRed else RefOrange
-                        )
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        horizontalAlignment = Alignment.Start
+                    ) {
+                        homeBins.take(3).forEach { bin ->
+                            val remaining = bin.remainingSeconds(state.totalElapsedSeconds)
+                            Text(
+                                text = "#${bin.playerNumber} %02d:%02d".format(
+                                    remaining / 60, remaining % 60
+                                ),
+                                fontSize = 11.sp,
+                                fontWeight = if (remaining < 60) FontWeight.Bold else FontWeight.Normal,
+                                color = if (remaining < 60) RefRed else RefOrange
+                            )
+                        }
+                    }
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        horizontalAlignment = Alignment.End
+                    ) {
+                        awayBins.take(3).forEach { bin ->
+                            val remaining = bin.remainingSeconds(state.totalElapsedSeconds)
+                            Text(
+                                text = "#${bin.playerNumber} %02d:%02d".format(
+                                    remaining / 60, remaining % 60
+                                ),
+                                fontSize = 11.sp,
+                                fontWeight = if (remaining < 60) FontWeight.Bold else FontWeight.Normal,
+                                color = if (remaining < 60) RefRed else RefOrange,
+                                textAlign = TextAlign.End
+                            )
+                        }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(1.dp))
-
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                CompactChip(
-                    label = { Text("GOAL", fontWeight = FontWeight.Bold) },
-                    onClick = { navController.navigate("goal") },
-                    colors = ChipDefaults.chipColors(backgroundColor = RefGreen)
-                )
-                CompactChip(
-                    label = { Text("CARD", fontWeight = FontWeight.Bold) },
-                    onClick = { navController.navigate("card") },
-                    colors = ChipDefaults.chipColors(backgroundColor = RefYellow)
-                )
-                CompactChip(
-                    label = { Text("SIN", fontWeight = FontWeight.Bold) },
-                    onClick = { navController.navigate("sinBin") },
-                    colors = ChipDefaults.chipColors(backgroundColor = RefOrange)
-                )
-            }
+            Spacer(modifier = Modifier.height(2.dp))
 
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 CompactChip(
@@ -171,59 +283,78 @@ fun MatchScreen(navController: NavController, viewModel: MatchViewModel) {
                 )
             }
         }
+    }
+}
 
-        // Card alert overlay (2nd yellow or dissent auto sin bin)
-        state.cardAlert?.let { alert ->
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color(0xEE000000)),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xFF1A0000))
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
-                ) {
-                    when (alert.type) {
-                        CardAlertType.SECOND_YELLOW_RED -> {
-                            Text("2ND YELLOW", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = RefYellow, textAlign = TextAlign.Center)
-                            Text("AUTO RED CARD", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = RefRed, textAlign = TextAlign.Center)
-                            Text("Player dismissed", style = MaterialTheme.typography.caption2, color = Color.Gray, textAlign = TextAlign.Center)
-                        }
-                        CardAlertType.SECOND_YELLOW_SIN_BIN -> {
-                            Text("2ND YELLOW", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = RefYellow, textAlign = TextAlign.Center)
-                            Text("SIN BIN", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = RefOrange, textAlign = TextAlign.Center)
-                            Text("${alert.sinBinMinutes} min — escalate to red if needed", style = MaterialTheme.typography.caption2, color = Color.Gray, textAlign = TextAlign.Center)
-                        }
-                        CardAlertType.DISSENT_SIN_BIN -> {
-                            Text("DISSENT", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = RefYellow, textAlign = TextAlign.Center)
-                            Text("AUTO SIN BIN", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = RefOrange, textAlign = TextAlign.Center)
-                            Text("${alert.sinBinMinutes} min", style = MaterialTheme.typography.caption2, color = Color.Gray, textAlign = TextAlign.Center)
-                        }
-                    }
+@Composable
+private fun TeamActionPage(
+    team: String,
+    teamKey: String,
+    viewModel: MatchViewModel,
+    navController: NavController
+) {
+    var goalFlash by remember { mutableStateOf(false) }
+    LaunchedEffect(goalFlash) {
+        if (goalFlash) {
+            delay(900)
+            goalFlash = false
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(horizontal = 16.dp)
+        ) {
+            Text(
+                text = team.uppercase(),
+                style = MaterialTheme.typography.title2,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            Chip(
+                label = {
                     Text(
-                        text = "#${alert.playerNumber}  ${alert.team}",
-                        style = MaterialTheme.typography.caption1,
-                        color = Color.White,
-                        textAlign = TextAlign.Center
+                        text = if (goalFlash) "GOAL ✓" else "GOAL",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp
                     )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Chip(
-                        label = { Text("OK", fontWeight = FontWeight.Bold) },
-                        onClick = { viewModel.dismissCardAlert() },
-                        colors = ChipDefaults.chipColors(
-                            backgroundColor = when (alert.type) {
-                                CardAlertType.SECOND_YELLOW_RED -> RefRed
-                                else -> RefOrange
-                            }
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
+                },
+                onClick = {
+                    viewModel.recordGoal(team)
+                    goalFlash = true
+                },
+                colors = ChipDefaults.chipColors(
+                    backgroundColor = if (goalFlash) Color(0xFF2E7D32) else RefGreen
+                ),
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                CompactChip(
+                    label = { Text("YEL", fontWeight = FontWeight.Bold) },
+                    onClick = { navController.navigate("card/$teamKey/YELLOW") },
+                    colors = ChipDefaults.chipColors(backgroundColor = RefYellow)
+                )
+                CompactChip(
+                    label = { Text("RED", fontWeight = FontWeight.Bold) },
+                    onClick = { navController.navigate("card/$teamKey/RED") },
+                    colors = ChipDefaults.chipColors(backgroundColor = RefRed)
+                )
+                CompactChip(
+                    label = { Text("SIN", fontWeight = FontWeight.Bold) },
+                    onClick = { navController.navigate("card/$teamKey/SIN_BIN") },
+                    colors = ChipDefaults.chipColors(backgroundColor = RefOrange)
+                )
             }
         }
     }

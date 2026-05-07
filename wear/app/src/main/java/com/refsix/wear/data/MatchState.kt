@@ -15,15 +15,9 @@ enum class AgeGroup(val label: String, val sinBinMinutes: Int) {
     U10("U10", 5)
 }
 
-enum class SecondYellowRule(val label: String) {
-    RED_CARD("Red Card"),
-    SIN_BIN("Sin Bin")
-}
-
 enum class CardAlertType {
-    SECOND_YELLOW_RED,      // 2nd yellow → auto red card (dismissed)
-    SECOND_YELLOW_SIN_BIN,  // 2nd yellow → auto sin bin (can escalate)
-    DISSENT_SIN_BIN         // dissent yellow → auto sin bin
+    SECOND_YELLOW_RED,  // 2nd yellow → auto red card (dismissed)
+    DISSENT_SIN_BIN     // dissent yellow → auto sin bin
 }
 
 data class CardAlert(
@@ -63,8 +57,6 @@ data class MatchState(
     val halfLengthMinutes: Int = 45,
     val ageGroup: AgeGroup = AgeGroup.OPEN_SENIOR,
     val sinBinMinutes: Int = 10,
-    // Default: 2nd yellow → sin bin; referee escalates to red manually if needed
-    val secondYellowRule: SecondYellowRule = SecondYellowRule.SIN_BIN,
     // Default: dissent automatically triggers a sin bin in addition to the caution
     val dissentAutoSinBin: Boolean = true,
     val homeScore: Int = 0,

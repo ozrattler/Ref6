@@ -10,6 +10,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
 import androidx.wear.compose.navigation.SwipeDismissableNavHost
 import androidx.wear.compose.navigation.composable
 import androidx.wear.compose.navigation.rememberSwipeDismissableNavController
@@ -88,6 +90,21 @@ class MainActivity : ComponentActivity() {
                     composable("card") {
                         CardScreen(
                             viewModel = matchViewModel,
+                            onCardRecorded = { navController.popBackStack() }
+                        )
+                    }
+
+                    composable(
+                        route = "card/{teamKey}/{cardTypeKey}",
+                        arguments = listOf(
+                            navArgument("teamKey") { type = NavType.StringType },
+                            navArgument("cardTypeKey") { type = NavType.StringType }
+                        )
+                    ) { entry ->
+                        CardScreen(
+                            viewModel = matchViewModel,
+                            teamKey = entry.arguments?.getString("teamKey"),
+                            cardTypeKey = entry.arguments?.getString("cardTypeKey"),
                             onCardRecorded = { navController.popBackStack() }
                         )
                     }

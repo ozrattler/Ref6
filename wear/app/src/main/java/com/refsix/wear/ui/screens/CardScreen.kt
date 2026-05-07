@@ -18,20 +18,35 @@ import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.material.*
 import com.refsix.wear.data.CardType
 import com.refsix.wear.data.Offences
-import com.refsix.wear.data.SecondYellowRule
 import com.refsix.wear.ui.theme.*
 import com.refsix.wear.viewmodel.MatchViewModel
 
 @Composable
-fun CardScreen(viewModel: MatchViewModel, onCardRecorded: () -> Unit) {
+fun CardScreen(
+    viewModel: MatchViewModel,
+    teamKey: String? = null,
+    cardTypeKey: String? = null,
+    onCardRecorded: () -> Unit
+) {
     val state by viewModel.state.collectAsState()
 
-    var selectedTeam by remember { mutableStateOf<String?>(null) }
-    var selectedCard by remember { mutableStateOf<CardType?>(null) }
+    val prefilledTeam = when (teamKey) {
+        "home" -> state.homeTeam
+        "away" -> state.awayTeam
+        else -> null
+    }
+    val prefilledCardType = when (cardTypeKey) {
+        "YELLOW" -> CardType.YELLOW
+        "RED" -> CardType.RED
+        "SIN_BIN" -> CardType.SIN_BIN
+        else -> null
+    }
+
+    var selectedTeam by remember { mutableStateOf(prefilledTeam) }
+    var selectedCard by remember { mutableStateOf(prefilledCardType) }
     var playerNumber by remember { mutableIntStateOf(1) }
     var selectedOffence by remember { mutableStateOf<String?>(null) }
 
-    // Pre-compute flags used across multiple items
     val isSecondYellow = selectedCard == CardType.YELLOW &&
         selectedTeam != null &&
         state.playerYellowCount(selectedTeam!!, "$playerNumber") >= 1
@@ -56,44 +71,54 @@ fun CardScreen(viewModel: MatchViewModel, onCardRecorded: () -> Unit) {
             )
         }
 
-        // Step 1: Team
-        item { SectionLabel("1. Team") }
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                SelectChip(
-                    label = state.homeTeam.take(6),
-                    selected = selectedTeam == state.homeTeam,
-                    onClick = { selectedTeam = state.homeTeam }
-                )
-                SelectChip(
-                    label = state.awayTeam.take(6),
-                    selected = selectedTeam == state.awayTeam,
-                    onClick = { selectedTeam = state.awayTeam }
-                )
-            }
-        }
-
-        // Step 2: Card type
-        item { SectionLabel("2. Card Type") }
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                CardTypeChip("YEL", CardType.YELLOW, RefYellow, selectedCard) {
-                    selectedCard = it
-                    selectedOffence = null
-                }
-                CardTypeChip("RED", CardType.RED, RefRed, selectedCard) {
-                    selectedCard = it
-                    selectedOffence = null
-                }
-                CardTypeChip("SIN", CardType.SIN_BIN, RefOrange, selectedCard) {
-                    selectedCard = it
-                    selectedOffence = null
+        // Step 1: Team (skip if pre-filled)
+        if (prefilledTeam == null) {
+            item { SectionLabel("1. Team") }
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    SelectChip(
+                        label = state.homeTeam.take(6),
+                        selected = selectedTeam == state.homeTeam,
+                        onClick = { selectedTeam = state.homeTeam }
+                    )
+                    SelectChip(
+                        label = state.awayTeam.take(6),
+                        selected = selectedTeam == state.awayTeam,
+                        onClick = { selectedTeam = state.awayTeam }
+                    )
                 }
             }
         }
 
-        // Step 3: Player number
-        item { SectionLabel("3. Player #") }
+        // Step 2: Card type (skip if pre-filled)
+        if (prefilledCardType == null) {
+            val stepNum = if (prefilledTeam == null) "2" else "1"
+            item { SectionLabel("$stepNum. Card Type") }
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    CardTypeChip("YEL", CardType.YELLOW, RefYellow, selectedCard) {
+                        selectedCard = it
+                        selectedOffence = null
+                    }
+                    CardTypeChip("RED", CardType.RED, RefRed, selectedCard) {
+                        selectedCard = it
+                        selectedOffence = null
+                    }
+                    CardTypeChip("SIN", CardType.SIN_BIN, RefOrange, selectedCard) {
+                        selectedCard = it
+                        selectedOffence = null
+                    }
+                }
+            }
+        }
+
+        // Step: Player number
+        val playerStepNum = when {
+            prefilledTeam != null && prefilledCardType != null -> "1"
+            prefilledTeam != null || prefilledCardType != null -> "2"
+            else -> "3"
+        }
+        item { SectionLabel("$playerStepNum. Player #") }
         item {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -117,28 +142,26 @@ fun CardScreen(viewModel: MatchViewModel, onCardRecorded: () -> Unit) {
             }
         }
 
-        // 2nd yellow warning — shown as soon as player # is set and a second yellow is detected
+        // 2nd yellow warning — always results in red card, no exceptions
         if (isSecondYellow) {
             item {
-                val (text, color) = when (state.secondYellowRule) {
-                    SecondYellowRule.SIN_BIN ->
-                        "2nd yellow — auto SIN BIN (${state.sinBinMinutes} min)" to RefOrange
-                    SecondYellowRule.RED_CARD ->
-                        "2nd yellow — auto RED CARD" to RefRed
-                }
-                NoticeBanner(text = text, color = color)
+                NoticeBanner(text = "2nd yellow — AUTO RED CARD", color = RefRed)
             }
         }
 
-        // Step 4: Offence
+        // Step: Offence
         if (selectedCard != null) {
-            item { SectionLabel("4. Offence") }
+            val offenceStepNum = when {
+                prefilledTeam != null && prefilledCardType != null -> "2"
+                prefilledTeam != null || prefilledCardType != null -> "3"
+                else -> "4"
+            }
+            item { SectionLabel("$offenceStepNum. Offence") }
 
             val offences = Offences.forCardType(selectedCard!!)
             items(offences.size) { index ->
                 val offence = offences[index]
                 val isSelected = selectedOffence == offence
-                // Dissent gets orange highlight when auto-sin-bin rule is active
                 val isDissent = offence == Offences.DISSENT &&
                     selectedCard == CardType.YELLOW &&
                     state.dissentAutoSinBin &&
@@ -191,7 +214,6 @@ fun CardScreen(viewModel: MatchViewModel, onCardRecorded: () -> Unit) {
             }
         }
 
-        // Post-selection notice for dissent auto sin bin
         if (isDissentSelected) {
             item {
                 NoticeBanner(
@@ -201,13 +223,12 @@ fun CardScreen(viewModel: MatchViewModel, onCardRecorded: () -> Unit) {
             }
         }
 
-        // Confirm button
         if (selectedTeam != null && selectedCard != null && selectedOffence != null) {
             item { Spacer(modifier = Modifier.height(4.dp)) }
             item {
                 val chipColor = when {
-                    isSecondYellow && state.secondYellowRule == SecondYellowRule.RED_CARD -> RefRed
-                    isSecondYellow || isDissentSelected -> RefOrange
+                    isSecondYellow -> RefRed
+                    isDissentSelected -> RefOrange
                     selectedCard == CardType.RED -> RefRed
                     selectedCard == CardType.SIN_BIN -> RefOrange
                     else -> RefYellow
