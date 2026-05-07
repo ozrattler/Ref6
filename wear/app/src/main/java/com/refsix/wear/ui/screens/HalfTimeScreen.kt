@@ -87,8 +87,14 @@ fun HalfTimeScreen(viewModel: MatchViewModel, onStartSecondHalf: () -> Unit) {
     }
 }
 
+// Shared by HalfTimeScreen, FullTimeScreen, and MatchReportScreen.
+// mainFontSp / detailFontSp let callers scale up for readability.
 @Composable
-internal fun EventItem(event: MatchEvent) {
+internal fun EventItem(
+    event: MatchEvent,
+    mainFontSp: Float = 13f,
+    detailFontSp: Float = 11f
+) {
     val (abbrev, color) = when (event.type) {
         EventType.GOAL -> "G" to RefGreen
         EventType.YELLOW_CARD -> "YC" to RefYellow
@@ -103,14 +109,15 @@ internal fun EventItem(event: MatchEvent) {
         }
         Text(
             text = mainLine,
-            style = MaterialTheme.typography.caption1,
+            fontSize = mainFontSp.sp,
+            fontWeight = FontWeight.Bold,
             color = color,
             modifier = Modifier.fillMaxWidth()
         )
         if (event.detail.isNotEmpty()) {
             Text(
                 text = event.detail,
-                style = MaterialTheme.typography.caption2,
+                fontSize = detailFontSp.sp,
                 color = Color.Gray,
                 modifier = Modifier.fillMaxWidth()
             )

@@ -1,6 +1,7 @@
 package com.refsix.wear.viewmodel
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.refsix.wear.data.AgeGroup
 import com.refsix.wear.data.CardAlert
@@ -10,7 +11,9 @@ import com.refsix.wear.data.EventType
 import com.refsix.wear.data.MatchEvent
 import com.refsix.wear.data.MatchPhase
 import com.refsix.wear.data.MatchState
+import com.refsix.wear.data.MatchStorage
 import com.refsix.wear.data.Offences
+import com.refsix.wear.data.SavedMatch
 import com.refsix.wear.data.SinBinEntry
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -26,12 +29,18 @@ import kotlinx.coroutines.launch
 
 sealed class MatchUiEvent {
     data class SinBinExpired(val team: String, val playerNumber: String) : MatchUiEvent()
+    object HalfTimeAlert : MatchUiEvent()
 }
 
-class MatchViewModel : ViewModel() {
+class MatchViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val matchStorage = MatchStorage(application)
 
     private val _state = MutableStateFlow(MatchState())
     val state: StateFlow<MatchState> = _state.asStateFlow()
+
+    private val _savedMatches = MutableStateFlow(matchStorage.loadMatches())
+    val savedMatches: StateFlow<List<SavedMatch>> = _savedMatches.asStateFlow()
 
     private val _uiEvents = MutableSharedFlow<MatchUiEvent>(extraBufferCapacity = 16)
     val uiEvents: SharedFlow<MatchUiEvent> = _uiEvents.asSharedFlow()
@@ -48,6 +57,7 @@ class MatchViewModel : ViewModel() {
             while (isActive) {
                 delay(1000L)
                 var justExpired = emptyList<SinBinEntry>()
+                var justReachedHalfEnd = false
                 _state.update { s ->
                     if (!s.isRunning) return@update s
                     val newHalf = s.halfElapsedSeconds + 1L
@@ -55,6 +65,10 @@ class MatchViewModel : ViewModel() {
                     justExpired = s.sinBins.filter {
                         !it.isExpired(s.totalElapsedSeconds) && it.isExpired(newTotal)
                     }
+                    justReachedHalfEnd =
+                        (s.phase == MatchPhase.FIRST_HALF || s.phase == MatchPhase.SECOND_HALF) &&
+                        s.halfElapsedSeconds < s.halfLengthSeconds &&
+                        newHalf >= s.halfLengthSeconds
                     s.copy(
                         halfElapsedSeconds = newHalf,
                         totalElapsedSeconds = newTotal,
@@ -63,6 +77,9 @@ class MatchViewModel : ViewModel() {
                 }
                 justExpired.forEach { bin ->
                     _uiEvents.tryEmit(MatchUiEvent.SinBinExpired(bin.team, bin.playerNumber))
+                }
+                if (justReachedHalfEnd) {
+                    _uiEvents.tryEmit(MatchUiEvent.HalfTimeAlert)
                 }
             }
         }
@@ -126,6 +143,8 @@ class MatchViewModel : ViewModel() {
 
     fun callFullTime() {
         _state.update { it.copy(phase = MatchPhase.FULL_TIME, isRunning = false) }
+        matchStorage.saveMatch(_state.value)
+        _savedMatches.value = matchStorage.loadMatches()
     }
 
     fun recordGoal(team: String) {
@@ -150,8 +169,6 @@ class MatchViewModel : ViewModel() {
             val minute = s.currentMatchMinute
             val half = s.currentHalf
 
-            // Yellow card count is checked FIRST — any yellow offence including Dissent
-            // triggers 2nd yellow logic when this player already has a caution.
             val isSecondYellow = cardType == CardType.YELLOW &&
                 s.playerYellowCount(team, playerNumber) >= 1
 
@@ -173,7 +190,6 @@ class MatchViewModel : ViewModel() {
             val alert: CardAlert?
 
             when {
-                // Red card — clear any existing sin bin for this player
                 cardType == CardType.RED -> {
                     newEvents = s.events + cardEvent
                     updatedSinBins = s.sinBins.filterNot {
@@ -182,7 +198,6 @@ class MatchViewModel : ViewModel() {
                     alert = s.cardAlert
                 }
 
-                // 2nd yellow always means red card and dismissal — no exceptions
                 isSecondYellow -> {
                     val autoRed = MatchEvent(
                         type = EventType.RED_CARD,
@@ -199,7 +214,6 @@ class MatchViewModel : ViewModel() {
                     alert = CardAlert(team, playerNumber, CardAlertType.SECOND_YELLOW_RED, s.sinBinMinutes)
                 }
 
-                // Dissent yellow (first caution only — 2nd yellow already handled above)
                 cardType == CardType.YELLOW &&
                     offence == Offences.DISSENT &&
                     s.dissentAutoSinBin -> {
@@ -214,7 +228,6 @@ class MatchViewModel : ViewModel() {
                     alert = CardAlert(team, playerNumber, CardAlertType.DISSENT_SIN_BIN, s.sinBinMinutes)
                 }
 
-                // Standard sin bin card
                 cardType == CardType.SIN_BIN -> {
                     newEvents = s.events + cardEvent
                     updatedSinBins = s.sinBins + SinBinEntry(
@@ -227,7 +240,6 @@ class MatchViewModel : ViewModel() {
                     alert = s.cardAlert
                 }
 
-                // Standard yellow — no special handling
                 else -> {
                     newEvents = s.events + cardEvent
                     updatedSinBins = s.sinBins

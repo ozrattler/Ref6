@@ -40,6 +40,12 @@ class MainActivity : ComponentActivity() {
                 val matchViewModel: MatchViewModel = viewModel()
                 val state by matchViewModel.state.collectAsState()
 
+                // Track current route to disable swipe-to-dismiss on report screens
+                val backStack by navController.currentBackStack.collectAsState()
+                val currentRoute = backStack.lastOrNull()?.destination?.route
+                val swipeEnabled = currentRoute != "fullTime" &&
+                    currentRoute != "report/{index}"
+
                 // Keep screen on while the match clock is running
                 LaunchedEffect(state.isRunning) {
                     if (state.isRunning) {
@@ -49,7 +55,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                // Vibrate when a sin bin expires — works regardless of which screen is showing
+                // Vibrate on sin bin expiry and scheduled half end
                 LaunchedEffect(Unit) {
                     matchViewModel.uiEvents.collect { event ->
                         when (event) {
@@ -61,13 +67,22 @@ class MainActivity : ComponentActivity() {
                                     )
                                 )
                             }
+                            is MatchUiEvent.HalfTimeAlert -> {
+                                vibrator?.vibrate(
+                                    VibrationEffect.createWaveform(
+                                        longArrayOf(0, 600, 200, 600, 200, 600),
+                                        -1
+                                    )
+                                )
+                            }
                         }
                     }
                 }
 
                 SwipeDismissableNavHost(
                     navController = navController,
-                    startDestination = "setup"
+                    startDestination = "setup",
+                    userSwipeEnabled = swipeEnabled
                 ) {
                     composable("setup") {
                         SetupScreen(
@@ -76,6 +91,9 @@ class MainActivity : ComponentActivity() {
                                 navController.navigate("match") {
                                     popUpTo("setup") { inclusive = false }
                                 }
+                            },
+                            onShowHistory = {
+                                navController.navigate("history")
                             }
                         )
                     }
@@ -142,6 +160,27 @@ class MainActivity : ComponentActivity() {
                                     popUpTo(0) { inclusive = true }
                                 }
                             }
+                        )
+                    }
+
+                    composable("history") {
+                        MatchHistoryScreen(
+                            viewModel = matchViewModel,
+                            navController = navController
+                        )
+                    }
+
+                    composable(
+                        route = "report/{index}",
+                        arguments = listOf(
+                            navArgument("index") { type = NavType.IntType }
+                        )
+                    ) { entry ->
+                        val index = entry.arguments?.getInt("index") ?: 0
+                        MatchReportScreen(
+                            viewModel = matchViewModel,
+                            index = index,
+                            onDone = { navController.popBackStack() }
                         )
                     }
                 }

@@ -24,7 +24,7 @@ import com.refsix.wear.ui.theme.*
 import com.refsix.wear.viewmodel.MatchViewModel
 
 @Composable
-fun SetupScreen(viewModel: MatchViewModel, onStartMatch: () -> Unit) {
+fun SetupScreen(viewModel: MatchViewModel, onStartMatch: () -> Unit, onShowHistory: () -> Unit = {}) {
     val state by viewModel.state.collectAsState()
 
     var homeTeam by remember { mutableStateOf(state.homeTeam) }
@@ -116,6 +116,14 @@ fun SetupScreen(viewModel: MatchViewModel, onStartMatch: () -> Unit) {
                 },
                 colors = ChipDefaults.chipColors(backgroundColor = RefGreen),
                 modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        item {
+            CompactChip(
+                label = { Text("Match History", fontWeight = FontWeight.Bold) },
+                onClick = onShowHistory,
+                colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF1A2A3A))
             )
         }
     }
