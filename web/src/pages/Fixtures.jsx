@@ -57,9 +57,16 @@ export default function Fixtures() {
 
   useEffect(() => {
     pb.collection('match_setups')
-      .getList(1, 200, { sort: 'kickoff_date,kickoff_time' })
+      .getList(1, 500, { requestKey: null })
       .then(r => {
-        setFixtures(r.items.filter(f => !f.status || f.status === 'pending'))
+        const pending = r.items
+          .filter(f => !f.status || f.status === 'pending')
+          .sort((a, b) => {
+            const da = (a.kickoff_date || '9999-12-31') + 'T' + (a.kickoff_time || '00:00')
+            const db = (b.kickoff_date || '9999-12-31') + 'T' + (b.kickoff_time || '00:00')
+            return da.localeCompare(db)
+          })
+        setFixtures(pending)
         setLoading(false)
       })
       .catch(e => { setError(e.message); setLoading(false) })

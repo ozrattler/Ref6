@@ -6,21 +6,24 @@ import FixtureFormFields from '../components/FixtureFormFields'
 
 function toForm(f) {
   return {
-    competition:    f.competition      || '',
-    venue:          f.venue            || '',
-    kickoffDate:    f.kickoff_date     || '',
-    kickoffTime:    f.kickoff_time     || '',
-    homeTeam:       f.home_team        || '',
-    homeColour:     f.home_colour      || '#dc2626',
-    awayTeam:       f.away_team        || '',
-    awayColour:     f.away_colour      || '#2563eb',
-    ageGroup:       f.age_group        || 'Open / Senior',
-    halfLength:     f.half_length      || 45,
-    dissentSinBin:  f.dissent_sin_bin  ?? true,
-    referee:        f.referee          || '',
-    ar1:            f.ar1              || '',
-    ar2:            f.ar2              || '',
-    fourthOfficial: f.fourth_official  || '',
+    competition:       f.competition         || '',
+    venue:             f.venue               || '',
+    kickoffDate:       f.kickoff_date        || '',
+    kickoffTime:       f.kickoff_time        || '',
+    homeTeam:          f.home_team           || '',
+    homeColour:        f.home_colour         || '#dc2626',
+    awayTeam:          f.away_team           || '',
+    awayColour:        f.away_colour         || '#2563eb',
+    ageGroup:          f.age_group           || 'Open / Senior',
+    halfLength:        f.half_length         || 45,
+    dissentSinBin:     f.dissent_sin_bin     ?? true,
+    recordGoalScorers: f.record_goal_scorers ?? true,
+    extraTime:         f.extra_time          ?? false,
+    penalties:         f.penalties           ?? false,
+    referee:           f.referee             || '',
+    ar1:               f.ar1                 || '',
+    ar2:               f.ar2                 || '',
+    fourthOfficial:    f.fourth_official     || '',
   }
 }
 
@@ -51,7 +54,7 @@ export default function FixtureDetail() {
   const [toast,    setToast]    = useState(null)
 
   useEffect(() => {
-    pb.collection('match_setups').getOne(id)
+    pb.collection('match_setups').getOne(id, { requestKey: null })
       .then(f => { setFixture(f); setForm(toForm(f)); setLoading(false) })
       .catch(e => { setError(e.message); setLoading(false) })
   }, [id])
@@ -73,23 +76,26 @@ export default function FixtureDetail() {
     setSaving(true)
     try {
       const updated = await pb.collection('match_setups').update(id, {
-        competition:      form.competition.trim(),
-        venue:            form.venue.trim(),
-        kickoff_date:     form.kickoffDate,
-        kickoff_time:     form.kickoffTime,
-        home_team:        form.homeTeam.trim(),
-        home_colour:      form.homeColour,
-        away_team:        form.awayTeam.trim(),
-        away_colour:      form.awayColour,
-        age_group:        form.ageGroup,
-        half_length:      form.halfLength,
-        two_yellows_rule: 'red_card',
-        dissent_sin_bin:  form.dissentSinBin,
-        referee:          form.referee.trim(),
-        ar1:              form.ar1.trim(),
-        ar2:              form.ar2.trim(),
-        fourth_official:  form.fourthOfficial.trim(),
-      })
+        competition:         form.competition.trim(),
+        venue:               form.venue.trim(),
+        kickoff_date:        form.kickoffDate,
+        kickoff_time:        form.kickoffTime,
+        home_team:           form.homeTeam.trim(),
+        home_colour:         form.homeColour,
+        away_team:           form.awayTeam.trim(),
+        away_colour:         form.awayColour,
+        age_group:           form.ageGroup,
+        half_length:         Number(form.halfLength),
+        two_yellows_rule:    'red_card',
+        dissent_sin_bin:     Boolean(form.dissentSinBin),
+        record_goal_scorers: Boolean(form.recordGoalScorers),
+        extra_time:          Boolean(form.extraTime),
+        penalties:           Boolean(form.penalties),
+        referee:             (form.referee        || '').trim(),
+        ar1:                 (form.ar1            || '').trim(),
+        ar2:                 (form.ar2            || '').trim(),
+        fourth_official:     (form.fourthOfficial || '').trim(),
+      }, { requestKey: null })
       setFixture(updated)
       setForm(toForm(updated))
       setEditing(false)
@@ -105,7 +111,7 @@ export default function FixtureDetail() {
     if (!window.confirm('Delete this fixture? This cannot be undone.')) return
     setDeleting(true)
     try {
-      await pb.collection('match_setups').delete(id)
+      await pb.collection('match_setups').delete(id, { requestKey: null })
       navigate(-1)
     } catch (err) {
       showToast(err.message || 'Failed to delete.', 'error')
@@ -192,14 +198,11 @@ export default function FixtureDetail() {
           <div className="fixture-rules-section">
             <div className="officials-title">Rules</div>
             <div className="officials-list">
-              <div className="official-item">
-                <span className="official-role">2nd Yellow</span>
-                <span className="official-name">Red Card</span>
-              </div>
-              <div className="official-item">
-                <span className="official-role">Dissent</span>
-                <span className="official-name">{f.dissent_sin_bin ? 'Sin Bin' : 'Yellow Card'}</span>
-              </div>
+              <OfficialItem role="2nd Yellow"    name="Red Card" />
+              <OfficialItem role="Dissent"       name={f.dissent_sin_bin     ? 'Sin Bin'    : 'Yellow Card'} />
+              <OfficialItem role="Goal Scorers"  name={f.record_goal_scorers !== false ? 'Recorded' : 'Not recorded'} />
+              {f.extra_time && <OfficialItem role="Extra Time" name="Yes" />}
+              {f.penalties  && <OfficialItem role="Penalties"  name="Yes" />}
             </div>
           </div>
         </>

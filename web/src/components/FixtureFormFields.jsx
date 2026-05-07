@@ -162,14 +162,21 @@ export default function FixtureFormFields({ form, set }) {
       {/* ── Competition Rules ── */}
       <div className="section-label">Competition Rules</div>
 
-      <div className="form-group toggle-row">
-        <span className="toggle-label">Dissent = Sin Bin</span>
-        <label className="toggle">
-          <input type="checkbox" checked={form.dissentSinBin}
-            onChange={e => set('dissentSinBin', e.target.checked)} />
-          <span className="toggle-track"><span className="toggle-thumb" /></span>
-        </label>
-      </div>
+      {[
+        ['dissentSinBin',     'Dissent = Sin Bin'],
+        ['recordGoalScorers', 'Record Goal Scorers'],
+        ['extraTime',         'Extra Time'],
+        ['penalties',         'Penalties'],
+      ].map(([field, label]) => (
+        <div key={field} className="form-group toggle-row">
+          <span className="toggle-label">{label}</span>
+          <label className="toggle">
+            <input type="checkbox" checked={!!form[field]}
+              onChange={e => set(field, e.target.checked)} />
+            <span className="toggle-track"><span className="toggle-thumb" /></span>
+          </label>
+        </div>
+      ))}
     </>
   )
 }

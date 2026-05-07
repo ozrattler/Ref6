@@ -1,41 +1,46 @@
 import { useState, useEffect } from 'react'
 import { pb } from '../lib/pb'
 import FixtureFormFields from '../components/FixtureFormFields'
+import TemplateManager from '../components/TemplateManager'
 
 const DEFAULT_FORM = {
-  competition:    '',
-  venue:          '',
-  kickoffDate:    '',
-  kickoffTime:    '',
-  homeTeam:       '',
-  homeColour:     '#dc2626',
-  awayTeam:       '',
-  awayColour:     '#2563eb',
-  ageGroup:       'Open / Senior',
-  halfLength:     45,
-  dissentSinBin:  true,
-  referee:        'Sir John',
-  ar1:            '',
-  ar2:            '',
-  fourthOfficial: '',
+  competition:       '',
+  venue:             '',
+  kickoffDate:       '',
+  kickoffTime:       '',
+  homeTeam:          '',
+  homeColour:        '#dc2626',
+  awayTeam:          '',
+  awayColour:        '#2563eb',
+  ageGroup:          'Open / Senior',
+  halfLength:        45,
+  dissentSinBin:     true,
+  recordGoalScorers: true,
+  extraTime:         false,
+  penalties:         false,
+  referee:           'Sir John',
+  ar1:               '',
+  ar2:               '',
+  fourthOfficial:    '',
 }
 
 export default function MatchSetup() {
-  const [form,             setForm]             = useState(DEFAULT_FORM)
-  const [saving,           setSaving]           = useState(false)
-  const [toast,            setToast]            = useState(null)
-  const [templates,        setTemplates]        = useState([])
-  const [showLoadTemplate, setShowLoadTemplate] = useState(false)
-  const [showSaveTemplate, setShowSaveTemplate] = useState(false)
-  const [templateName,     setTemplateName]     = useState('')
-  const [savingTpl,        setSavingTpl]        = useState(false)
+  const [form,                setForm]                = useState(DEFAULT_FORM)
+  const [saving,              setSaving]              = useState(false)
+  const [toast,               setToast]               = useState(null)
+  const [templates,           setTemplates]           = useState([])
+  const [showLoadTemplate,    setShowLoadTemplate]    = useState(false)
+  const [showSaveTemplate,    setShowSaveTemplate]    = useState(false)
+  const [showTemplateManager, setShowTemplateManager] = useState(false)
+  const [templateName,        setTemplateName]        = useState('')
+  const [savingTpl,           setSavingTpl]           = useState(false)
 
   useEffect(() => { fetchTemplates() }, [])
 
   function fetchTemplates() {
     pb.collection('templates')
-      .getList(1, 100, { sort: 'name' })
-      .then(r => setTemplates(r.items))
+      .getList(1, 200, { requestKey: null })
+      .then(r => setTemplates(r.items.sort((a, b) => a.name.localeCompare(b.name))))
       .catch(() => {})
   }
 
@@ -47,22 +52,25 @@ export default function MatchSetup() {
     setForm(f => ({
       ...f,
       // match-specific fields always reset to blank
-      venue:          '',
-      kickoffDate:    '',
-      kickoffTime:    '',
-      homeTeam:       '',
-      homeColour:     '#dc2626',
-      awayTeam:       '',
-      awayColour:     '#2563eb',
+      venue:             '',
+      kickoffDate:       '',
+      kickoffTime:       '',
+      homeTeam:          '',
+      homeColour:        '#dc2626',
+      awayTeam:          '',
+      awayColour:        '#2563eb',
       // competition rules & settings from template
-      competition:    t.competition      || '',
-      ageGroup:       t.age_group        || 'Open / Senior',
-      halfLength:     t.half_length      || 45,
-      dissentSinBin:  t.dissent_sin_bin  ?? true,
-      referee:        t.referee          || 'Sir John',
-      ar1:            t.ar1              || '',
-      ar2:            t.ar2              || '',
-      fourthOfficial: t.fourth_official  || '',
+      competition:       t.competition         || '',
+      ageGroup:          t.age_group           || 'Open / Senior',
+      halfLength:        t.half_length         || 45,
+      dissentSinBin:     t.dissent_sin_bin     ?? true,
+      recordGoalScorers: t.record_goal_scorers ?? true,
+      extraTime:         t.extra_time          ?? false,
+      penalties:         t.penalties           ?? false,
+      referee:           t.referee             || 'Sir John',
+      ar1:               t.ar1                 || '',
+      ar2:               t.ar2                 || '',
+      fourthOfficial:    t.fourth_official     || '',
     }))
     setShowLoadTemplate(false)
     showToast(`Template "${t.name}" loaded`)
@@ -73,17 +81,20 @@ export default function MatchSetup() {
     setSavingTpl(true)
     try {
       await pb.collection('templates').create({
-        name:             templateName.trim(),
-        competition:      form.competition,
-        age_group:        form.ageGroup,
-        half_length:      form.halfLength,
-        two_yellows_rule: 'red_card',
-        dissent_sin_bin:  form.dissentSinBin,
-        referee:          form.referee,
-        ar1:              form.ar1,
-        ar2:              form.ar2,
-        fourth_official:  form.fourthOfficial,
-      })
+        name:                templateName.trim(),
+        competition:         form.competition,
+        age_group:           form.ageGroup,
+        half_length:         Number(form.halfLength),
+        two_yellows_rule:    'red_card',
+        dissent_sin_bin:     Boolean(form.dissentSinBin),
+        record_goal_scorers: Boolean(form.recordGoalScorers),
+        extra_time:          Boolean(form.extraTime),
+        penalties:           Boolean(form.penalties),
+        referee:             form.referee,
+        ar1:                 form.ar1,
+        ar2:                 form.ar2,
+        fourth_official:     form.fourthOfficial,
+      }, { requestKey: null })
       fetchTemplates()
       setTemplateName('')
       setShowSaveTemplate(false)
@@ -109,24 +120,27 @@ export default function MatchSetup() {
     setSaving(true)
     try {
       await pb.collection('match_setups').create({
-        competition:      form.competition.trim(),
-        venue:            form.venue.trim(),
-        kickoff_date:     form.kickoffDate,
-        kickoff_time:     form.kickoffTime,
-        home_team:        form.homeTeam.trim(),
-        home_colour:      form.homeColour,
-        away_team:        form.awayTeam.trim(),
-        away_colour:      form.awayColour,
-        age_group:        form.ageGroup,
-        half_length:      form.halfLength,
-        two_yellows_rule: 'red_card',
-        dissent_sin_bin:  form.dissentSinBin,
-        referee:          form.referee.trim(),
-        ar1:              form.ar1.trim(),
-        ar2:              form.ar2.trim(),
-        fourth_official:  form.fourthOfficial.trim(),
-        status:           'pending',
-      })
+        competition:         form.competition.trim(),
+        venue:               form.venue.trim(),
+        kickoff_date:        form.kickoffDate,
+        kickoff_time:        form.kickoffTime,
+        home_team:           form.homeTeam.trim(),
+        home_colour:         form.homeColour,
+        away_team:           form.awayTeam.trim(),
+        away_colour:         form.awayColour,
+        age_group:           form.ageGroup,
+        half_length:         Number(form.halfLength),
+        two_yellows_rule:    'red_card',
+        dissent_sin_bin:     Boolean(form.dissentSinBin),
+        record_goal_scorers: Boolean(form.recordGoalScorers),
+        extra_time:          Boolean(form.extraTime),
+        penalties:           Boolean(form.penalties),
+        referee:             (form.referee        || '').trim(),
+        ar1:                 (form.ar1            || '').trim(),
+        ar2:                 (form.ar2            || '').trim(),
+        fourth_official:     (form.fourthOfficial || '').trim(),
+        status:              'pending',
+      }, { requestKey: null })
       showToast('Match setup saved!')
       setForm(f => ({
         ...f,
@@ -152,6 +166,9 @@ export default function MatchSetup() {
           <button type="button" className="btn-template btn-template-save" onClick={() => setShowSaveTemplate(true)}>
             Save as Template
           </button>
+          <button type="button" className="btn-template" onClick={() => setShowTemplateManager(true)}>
+            Manage
+          </button>
         </div>
       </div>
 
@@ -164,7 +181,6 @@ export default function MatchSetup() {
         </button>
       </form>
 
-      {/* Load Template Modal */}
       {showLoadTemplate && (
         <TemplatePickerModal
           templates={templates}
@@ -173,7 +189,6 @@ export default function MatchSetup() {
         />
       )}
 
-      {/* Save as Template Modal */}
       {showSaveTemplate && (
         <div className="modal-backdrop" onClick={e => { if (e.target === e.currentTarget) setShowSaveTemplate(false) }}>
           <div className="modal">
@@ -186,6 +201,9 @@ export default function MatchSetup() {
                 autoFocus
                 onKeyDown={e => e.key === 'Enter' && handleSaveTemplate()} />
             </div>
+            <p className="modal-note" style={{ marginTop: 4 }}>
+              Saves: competition, age group, half length, rules, and officials. Not team names or match dates.
+            </p>
             <div className="modal-actions">
               <button className="btn-ghost" onClick={() => setShowSaveTemplate(false)}>Cancel</button>
               <button className="btn-primary-sm" onClick={handleSaveTemplate}
@@ -195,6 +213,14 @@ export default function MatchSetup() {
             </div>
           </div>
         </div>
+      )}
+
+      {showTemplateManager && (
+        <TemplateManager
+          templates={templates}
+          onClose={() => setShowTemplateManager(false)}
+          onRefresh={fetchTemplates}
+        />
       )}
 
       {toast && <div className={`toast toast-${toast.type}`}>{toast.msg}</div>}
@@ -215,14 +241,10 @@ function TemplatePickerModal({ templates, onSelect, onClose }) {
           <div className="template-list">
             {templates.map(t => (
               <button key={t.id} className="template-item" onClick={() => onSelect(t)}>
-                <div className="template-item-colours">
-                  {t.home_colour && <span className="template-kit-dot" style={{ background: t.home_colour }} />}
-                  {t.away_colour && <span className="template-kit-dot" style={{ background: t.away_colour }} />}
-                </div>
                 <div className="template-item-body">
                   <div className="template-item-name">{t.name}</div>
                   <div className="template-item-detail">
-                    {[t.competition, t.age_group, t.venue].filter(Boolean).join(' · ')}
+                    {[t.competition, t.age_group, t.referee && `Ref: ${t.referee}`].filter(Boolean).join(' · ')}
                   </div>
                 </div>
               </button>

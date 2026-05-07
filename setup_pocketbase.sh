@@ -164,15 +164,20 @@ MATCH_SETUPS_ID=$(get_or_create_collection "match_setups" '{
   ]
 }')
 ensure_fields "$MATCH_SETUPS_ID" "match_setups" \
-    '{"name":"referee",         "type":"text","required":false,"options":{}}' \
-    '{"name":"ar1",             "type":"text","required":false,"options":{}}' \
-    '{"name":"ar2",             "type":"text","required":false,"options":{}}' \
-    '{"name":"fourth_official", "type":"text","required":false,"options":{}}' \
-    '{"name":"home_colour",     "type":"text","required":false,"options":{}}' \
-    '{"name":"away_colour",     "type":"text","required":false,"options":{}}' \
-    '{"name":"venue",           "type":"text","required":false,"options":{}}' \
-    '{"name":"kickoff_date",    "type":"text","required":false,"options":{}}' \
-    '{"name":"kickoff_time",    "type":"text","required":false,"options":{}}'
+    '{"name":"referee",              "type":"text","required":false,"options":{}}' \
+    '{"name":"ar1",                  "type":"text","required":false,"options":{}}' \
+    '{"name":"ar2",                  "type":"text","required":false,"options":{}}' \
+    '{"name":"fourth_official",      "type":"text","required":false,"options":{}}' \
+    '{"name":"home_colour",          "type":"text","required":false,"options":{}}' \
+    '{"name":"away_colour",          "type":"text","required":false,"options":{}}' \
+    '{"name":"venue",                "type":"text","required":false,"options":{}}' \
+    '{"name":"kickoff_date",         "type":"text","required":false,"options":{}}' \
+    '{"name":"kickoff_time",         "type":"text","required":false,"options":{}}' \
+    '{"name":"two_yellows_rule",     "type":"text","required":false,"options":{}}' \
+    '{"name":"dissent_sin_bin",      "type":"bool","required":false,"options":{}}' \
+    '{"name":"record_goal_scorers",  "type":"bool","required":false,"options":{}}' \
+    '{"name":"extra_time",           "type":"bool","required":false,"options":{}}' \
+    '{"name":"penalties",            "type":"bool","required":false,"options":{}}'
 set_public_rules "$MATCH_SETUPS_ID"
 echo "  match_setups id: $MATCH_SETUPS_ID"
 
@@ -181,23 +186,25 @@ TEMPLATES_ID=$(get_or_create_collection "templates" '{
   "name": "templates",
   "type": "base",
   "schema": [
-    {"name": "name",             "type": "text",   "required": true,  "options": {}},
-    {"name": "competition",      "type": "text",   "required": false, "options": {}},
-    {"name": "home_team",        "type": "text",   "required": false, "options": {}},
-    {"name": "away_team",        "type": "text",   "required": false, "options": {}},
-    {"name": "home_colour",      "type": "text",   "required": false, "options": {}},
-    {"name": "away_colour",      "type": "text",   "required": false, "options": {}},
-    {"name": "age_group",        "type": "text",   "required": false, "options": {}},
-    {"name": "half_length",      "type": "number", "required": false, "options": {}},
-    {"name": "two_yellows_rule", "type": "text",   "required": false, "options": {}},
-    {"name": "dissent_sin_bin",  "type": "bool",   "required": false, "options": {}},
-    {"name": "referee",          "type": "text",   "required": false, "options": {}},
-    {"name": "ar1",              "type": "text",   "required": false, "options": {}},
-    {"name": "ar2",              "type": "text",   "required": false, "options": {}},
-    {"name": "fourth_official",  "type": "text",   "required": false, "options": {}},
-    {"name": "venue",            "type": "text",   "required": false, "options": {}}
+    {"name": "name",                "type": "text",   "required": true,  "options": {}},
+    {"name": "competition",         "type": "text",   "required": false, "options": {}},
+    {"name": "age_group",           "type": "text",   "required": false, "options": {}},
+    {"name": "half_length",         "type": "number", "required": false, "options": {}},
+    {"name": "two_yellows_rule",    "type": "text",   "required": false, "options": {}},
+    {"name": "dissent_sin_bin",     "type": "bool",   "required": false, "options": {}},
+    {"name": "record_goal_scorers", "type": "bool",   "required": false, "options": {}},
+    {"name": "extra_time",          "type": "bool",   "required": false, "options": {}},
+    {"name": "penalties",           "type": "bool",   "required": false, "options": {}},
+    {"name": "referee",             "type": "text",   "required": false, "options": {}},
+    {"name": "ar1",                 "type": "text",   "required": false, "options": {}},
+    {"name": "ar2",                 "type": "text",   "required": false, "options": {}},
+    {"name": "fourth_official",     "type": "text",   "required": false, "options": {}}
   ]
 }')
+ensure_fields "$TEMPLATES_ID" "templates" \
+    '{"name":"record_goal_scorers",  "type":"bool","required":false,"options":{}}' \
+    '{"name":"extra_time",           "type":"bool","required":false,"options":{}}' \
+    '{"name":"penalties",            "type":"bool","required":false,"options":{}}'
 set_public_rules "$TEMPLATES_ID"
 echo "  templates id: $TEMPLATES_ID"
 
