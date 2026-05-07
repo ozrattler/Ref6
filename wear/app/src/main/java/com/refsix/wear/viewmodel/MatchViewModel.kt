@@ -14,6 +14,7 @@ import com.refsix.wear.data.MatchPhase
 import com.refsix.wear.data.MatchState
 import com.refsix.wear.data.MatchStorage
 import com.refsix.wear.data.Offences
+import com.refsix.wear.data.PocketBaseSync
 import com.refsix.wear.data.SavedMatch
 import com.refsix.wear.data.SinBinEntry
 import kotlinx.coroutines.Job
@@ -38,6 +39,7 @@ sealed class MatchUiEvent {
 class MatchViewModel(application: Application) : AndroidViewModel(application) {
 
     private val matchStorage = MatchStorage(application)
+    private val pocketBaseSync = PocketBaseSync(application)
 
     private val _state = MutableStateFlow(MatchState())
     val state: StateFlow<MatchState> = _state.asStateFlow()
@@ -61,6 +63,7 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         launchTimer()
+        viewModelScope.launch { syncUnsyncedMatches() }
     }
 
     private fun launchTimer() {
@@ -178,7 +181,21 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
         _state.update { it.copy(phase = MatchPhase.FULL_TIME, isRunning = false) }
         matchStorage.saveMatch(_state.value)
         _savedMatches.value = matchStorage.loadMatches()
-        viewModelScope.launch { _uiEvents.emit(MatchUiEvent.FullTimeAlert) }
+        viewModelScope.launch {
+            _uiEvents.emit(MatchUiEvent.FullTimeAlert)
+            syncUnsyncedMatches()
+        }
+    }
+
+    private suspend fun syncUnsyncedMatches() {
+        if (!pocketBaseSync.isWifiConnected()) return
+        matchStorage.getUnsyncedMatches().forEach { match ->
+            val pbId = pocketBaseSync.syncMatch(match)
+            if (pbId != null) {
+                matchStorage.markSynced(match.id, pbId)
+                _savedMatches.value = matchStorage.loadMatches()
+            }
+        }
     }
 
     fun recordGoal(team: String, scorerNumber: String = "", scorerName: String = "") {

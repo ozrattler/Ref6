@@ -13,16 +13,13 @@ class MatchStorage(context: Context) {
             homeScore = state.homeScore,
             awayScore = state.awayScore,
             halfLengthMinutes = state.halfLengthMinutes,
+            ageGroup = state.ageGroup.label,
+            competition = state.competitionType.label,
             events = state.events
         )
         val existing = loadMatches().toMutableList()
         existing.add(0, match)
-        val toSave = existing.take(MAX_MATCHES)
-        prefs.edit().apply {
-            putInt("count", toSave.size)
-            toSave.forEachIndexed { i, m -> putString("match_$i", m.toJson()) }
-            apply()
-        }
+        persist(existing.take(MAX_MATCHES))
     }
 
     fun loadMatches(): List<SavedMatch> {
@@ -34,8 +31,25 @@ class MatchStorage(context: Context) {
         }
     }
 
+    fun getUnsyncedMatches(): List<SavedMatch> = loadMatches().filter { it.pocketBaseId == null }
+
+    fun markSynced(matchId: Long, pocketBaseId: String) {
+        val updated = loadMatches().map { m ->
+            if (m.id == matchId) m.copy(pocketBaseId = pocketBaseId) else m
+        }
+        persist(updated)
+    }
+
     fun clearHistory() {
         prefs.edit().clear().apply()
+    }
+
+    private fun persist(matches: List<SavedMatch>) {
+        prefs.edit().apply {
+            putInt("count", matches.size)
+            matches.forEachIndexed { i, m -> putString("match_$i", m.toJson()) }
+            apply()
+        }
     }
 
     companion object {
