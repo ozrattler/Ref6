@@ -309,7 +309,7 @@ private fun TeamActionPage(
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
             modifier = Modifier.padding(horizontal = 16.dp)
         ) {
             Text(
@@ -321,12 +321,14 @@ private fun TeamActionPage(
                 overflow = TextOverflow.Ellipsis
             )
 
+            // Goal — large distinct button
             Chip(
                 label = {
                     Text(
-                        text = if (goalFlash) "GOAL ✓" else "GOAL",
+                        text = if (goalFlash) "GOAL  ✓" else "GOAL",
                         fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp
+                        fontSize = 20.sp,
+                        letterSpacing = 1.sp
                     )
                 },
                 onClick = {
@@ -334,26 +336,24 @@ private fun TeamActionPage(
                     goalFlash = true
                 },
                 colors = ChipDefaults.chipColors(
-                    backgroundColor = if (goalFlash) Color(0xFF2E7D32) else RefGreen
+                    backgroundColor = if (goalFlash) Color(0xFF1B5E20) else Color(0xFF2E7D32)
                 ),
                 modifier = Modifier.fillMaxWidth()
             )
 
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Cards — compact, visually grouped below the goal button
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 CompactChip(
-                    label = { Text("YEL", fontWeight = FontWeight.Bold) },
+                    label = { Text("YC", fontWeight = FontWeight.Bold) },
                     onClick = { navController.navigate("card/$teamKey/YELLOW") },
                     colors = ChipDefaults.chipColors(backgroundColor = RefYellow)
                 )
                 CompactChip(
-                    label = { Text("RED", fontWeight = FontWeight.Bold) },
+                    label = { Text("RC", fontWeight = FontWeight.Bold) },
                     onClick = { navController.navigate("card/$teamKey/RED") },
                     colors = ChipDefaults.chipColors(backgroundColor = RefRed)
-                )
-                CompactChip(
-                    label = { Text("SIN", fontWeight = FontWeight.Bold) },
-                    onClick = { navController.navigate("card/$teamKey/SIN_BIN") },
-                    colors = ChipDefaults.chipColors(backgroundColor = RefOrange)
                 )
             }
         }
