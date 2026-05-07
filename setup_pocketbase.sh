@@ -33,9 +33,7 @@ trap 'rm -f "$TMPFILE"' EXIT
 
 # Returns collection ID via stdout; all progress goes to stderr.
 get_or_create_collection() {
-    local name=$1
-    local body=$2
-
+    local name=$1 body=$2
     local check_code
     check_code=$(curl -s -o "$TMPFILE" -w "%{http_code}" -H "$AUTH_HEADER" "$PB_URL/api/collections/$name")
     if [[ "$check_code" == "200" ]]; then
@@ -43,20 +41,51 @@ get_or_create_collection() {
         jq -r '.id' "$TMPFILE"
         return
     fi
-
     echo "→ Creating '$name' collection..." >&2
     local http_code
     http_code=$(curl -s -o "$TMPFILE" -w "%{http_code}" \
         -X POST "$PB_URL/api/collections" \
-        -H "$AUTH_HEADER" \
-        -H "Content-Type: application/json" \
-        -d "$body")
+        -H "$AUTH_HEADER" -H "Content-Type: application/json" -d "$body")
     if [[ "$http_code" != 2* ]]; then
         echo "  Error (HTTP $http_code): $(jq -r '.message // .' "$TMPFILE")" >&2
         exit 1
     fi
     echo "  Created." >&2
     jq -r '.id' "$TMPFILE"
+}
+
+# Add any missing fields to a collection. Args: cid label field_json ...
+ensure_fields() {
+    local cid=$1 label=$2
+    shift 2
+    echo "→ Checking '$label' schema..." >&2
+    local col_data current new_schema
+    col_data=$(curl -s -H "$AUTH_HEADER" "$PB_URL/api/collections/$cid")
+    current=$(echo "$col_data" | jq '.schema // []')
+    new_schema="$current"
+    local added=0
+    for field_json in "$@"; do
+        local fname exists
+        fname=$(echo "$field_json" | jq -r '.name')
+        exists=$(echo "$new_schema" | jq --arg n "$fname" '[.[] | select(.name == $n)] | length')
+        if [[ "$exists" == "0" ]]; then
+            new_schema=$(echo "$new_schema" | jq --argjson f "$field_json" '. += [$f]')
+            added=$((added + 1))
+        fi
+    done
+    if [[ $added -gt 0 ]]; then
+        local code
+        code=$(curl -s -o "$TMPFILE" -w "%{http_code}" -X PATCH "$PB_URL/api/collections/$cid" \
+            -H "$AUTH_HEADER" -H "Content-Type: application/json" \
+            -d "{\"schema\": $new_schema}")
+        if [[ "$code" == 2* ]]; then
+            echo "  Added $added field(s)." >&2
+        else
+            echo "  Warning (HTTP $code): $(jq -r '.message // .' "$TMPFILE")" >&2
+        fi
+    else
+        echo "  All fields present." >&2
+    fi
 }
 
 # Sets list/view/create/update rules to "" (public) on a collection by id.
@@ -66,6 +95,9 @@ set_public_rules() {
         -H "$AUTH_HEADER" -H "Content-Type: application/json" \
         -d '{"listRule":"","viewRule":"","createRule":"","updateRule":""}'
 }
+
+# Shared field definitions reused across collections
+TEXT='{"required":false,"options":{}}'
 
 # ── matches ───────────────────────────────────────────────────────────────────
 MATCHES_ID=$(get_or_create_collection "matches" '{
@@ -82,6 +114,16 @@ MATCHES_ID=$(get_or_create_collection "matches" '{
     {"name": "status",      "type": "text",   "required": false, "options": {}}
   ]
 }')
+ensure_fields "$MATCHES_ID" "matches" \
+    '{"name":"referee",         "type":"text","required":false,"options":{}}' \
+    '{"name":"ar1",             "type":"text","required":false,"options":{}}' \
+    '{"name":"ar2",             "type":"text","required":false,"options":{}}' \
+    '{"name":"fourth_official", "type":"text","required":false,"options":{}}' \
+    '{"name":"home_colour",     "type":"text","required":false,"options":{}}' \
+    '{"name":"away_colour",     "type":"text","required":false,"options":{}}' \
+    '{"name":"venue",           "type":"text","required":false,"options":{}}' \
+    '{"name":"kickoff_date",    "type":"text","required":false,"options":{}}' \
+    '{"name":"kickoff_time",    "type":"text","required":false,"options":{}}'
 set_public_rules "$MATCHES_ID"
 echo "  matches id: $MATCHES_ID"
 
@@ -101,29 +143,10 @@ INCIDENTS_BODY=$(jq -n --arg cid "$MATCHES_ID" '{
   ]
 }')
 INCIDENTS_ID=$(get_or_create_collection "incidents" "$INCIDENTS_BODY")
+ensure_fields "$INCIDENTS_ID" "incidents" \
+    '{"name":"half","type":"number","required":false,"options":{}}'
 set_public_rules "$INCIDENTS_ID"
 echo "  incidents id: $INCIDENTS_ID"
-
-# Add 'half' field to incidents if it was created before this field existed
-echo "→ Checking incidents schema for 'half' field..."
-INCIDENTS_COL=$(curl -s -H "$AUTH_HEADER" "$PB_URL/api/collections/incidents")
-HAS_HALF=$(echo "$INCIDENTS_COL" | jq '[.schema[]? | select(.name == "half")] | length')
-if [[ "$HAS_HALF" == "0" ]]; then
-    echo "  Adding 'half' field..."
-    CURRENT_SCHEMA=$(echo "$INCIDENTS_COL" | jq '.schema')
-    NEW_SCHEMA=$(echo "$CURRENT_SCHEMA" | jq '. += [{"name":"half","type":"number","required":false,"options":{}}]')
-    http_code=$(curl -s -o "$TMPFILE" -w "%{http_code}" \
-        -X PATCH "$PB_URL/api/collections/$INCIDENTS_ID" \
-        -H "$AUTH_HEADER" -H "Content-Type: application/json" \
-        -d "{\"schema\": $NEW_SCHEMA}")
-    if [[ "$http_code" == 2* ]]; then
-        echo "  Added."
-    else
-        echo "  Warning (HTTP $http_code): $(jq -r '.message // .' "$TMPFILE") — add 'half' manually in the admin UI."
-    fi
-else
-    echo "  Already present."
-fi
 
 # ── match_setups ──────────────────────────────────────────────────────────────
 MATCH_SETUPS_ID=$(get_or_create_collection "match_setups" '{
@@ -140,8 +163,43 @@ MATCH_SETUPS_ID=$(get_or_create_collection "match_setups" '{
     {"name": "status",           "type": "text",   "required": false, "options": {}}
   ]
 }')
+ensure_fields "$MATCH_SETUPS_ID" "match_setups" \
+    '{"name":"referee",         "type":"text","required":false,"options":{}}' \
+    '{"name":"ar1",             "type":"text","required":false,"options":{}}' \
+    '{"name":"ar2",             "type":"text","required":false,"options":{}}' \
+    '{"name":"fourth_official", "type":"text","required":false,"options":{}}' \
+    '{"name":"home_colour",     "type":"text","required":false,"options":{}}' \
+    '{"name":"away_colour",     "type":"text","required":false,"options":{}}' \
+    '{"name":"venue",           "type":"text","required":false,"options":{}}' \
+    '{"name":"kickoff_date",    "type":"text","required":false,"options":{}}' \
+    '{"name":"kickoff_time",    "type":"text","required":false,"options":{}}'
 set_public_rules "$MATCH_SETUPS_ID"
 echo "  match_setups id: $MATCH_SETUPS_ID"
+
+# ── templates ─────────────────────────────────────────────────────────────────
+TEMPLATES_ID=$(get_or_create_collection "templates" '{
+  "name": "templates",
+  "type": "base",
+  "schema": [
+    {"name": "name",             "type": "text",   "required": true,  "options": {}},
+    {"name": "competition",      "type": "text",   "required": false, "options": {}},
+    {"name": "home_team",        "type": "text",   "required": false, "options": {}},
+    {"name": "away_team",        "type": "text",   "required": false, "options": {}},
+    {"name": "home_colour",      "type": "text",   "required": false, "options": {}},
+    {"name": "away_colour",      "type": "text",   "required": false, "options": {}},
+    {"name": "age_group",        "type": "text",   "required": false, "options": {}},
+    {"name": "half_length",      "type": "number", "required": false, "options": {}},
+    {"name": "two_yellows_rule", "type": "text",   "required": false, "options": {}},
+    {"name": "dissent_sin_bin",  "type": "bool",   "required": false, "options": {}},
+    {"name": "referee",          "type": "text",   "required": false, "options": {}},
+    {"name": "ar1",              "type": "text",   "required": false, "options": {}},
+    {"name": "ar2",              "type": "text",   "required": false, "options": {}},
+    {"name": "fourth_official",  "type": "text",   "required": false, "options": {}},
+    {"name": "venue",            "type": "text",   "required": false, "options": {}}
+  ]
+}')
+set_public_rules "$TEMPLATES_ID"
+echo "  templates id: $TEMPLATES_ID"
 
 echo ""
 echo "All done. Collections are live at $PB_URL/_/#/collections"
