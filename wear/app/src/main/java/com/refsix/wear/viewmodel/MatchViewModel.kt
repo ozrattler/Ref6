@@ -32,6 +32,7 @@ sealed class MatchUiEvent {
     data class SinBinExpired(val team: String, val playerNumber: String) : MatchUiEvent()
     object HalfTimeAlert : MatchUiEvent()
     object FullTimeAlert : MatchUiEvent()
+    object HalfTimeCountdownExpired : MatchUiEvent()
 }
 
 class MatchViewModel(application: Application) : AndroidViewModel(application) {
@@ -45,6 +46,10 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
     // restarting the effect without any mid-animation state mutation.
     private val _returnToCenterCount = MutableStateFlow(0)
     val returnToCenterCount: StateFlow<Int> = _returnToCenterCount.asStateFlow()
+
+    private val _halfTimeCountdown = MutableStateFlow(0)
+    val halfTimeCountdown: StateFlow<Int> = _halfTimeCountdown.asStateFlow()
+    private var halfTimeCountdownJob: Job? = null
 
     private val _savedMatches = MutableStateFlow(matchStorage.loadMatches())
     val savedMatches: StateFlow<List<SavedMatch>> = _savedMatches.asStateFlow()
@@ -137,9 +142,28 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
 
     fun callHalfTime() {
         _state.update { it.copy(phase = MatchPhase.HALF_TIME, isRunning = false) }
+        startHalfTimeCountdown()
+    }
+
+    private fun startHalfTimeCountdown() {
+        halfTimeCountdownJob?.cancel()
+        halfTimeCountdownJob = viewModelScope.launch {
+            var remaining = 300
+            _halfTimeCountdown.value = remaining
+            while (remaining > 0 && isActive) {
+                delay(1000L)
+                remaining--
+                _halfTimeCountdown.value = remaining
+            }
+            if (isActive) {
+                _uiEvents.tryEmit(MatchUiEvent.HalfTimeCountdownExpired)
+            }
+        }
     }
 
     fun startSecondHalf() {
+        halfTimeCountdownJob?.cancel()
+        _halfTimeCountdown.value = 0
         _state.update {
             it.copy(
                 phase = MatchPhase.SECOND_HALF,
@@ -276,6 +300,8 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun resetMatch() {
+        halfTimeCountdownJob?.cancel()
+        _halfTimeCountdown.value = 0
         _state.value = MatchState()
     }
 }

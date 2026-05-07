@@ -30,7 +30,6 @@ fun SetupScreen(viewModel: MatchViewModel, onStartMatch: () -> Unit, onShowHisto
 
     var homeTeam by remember { mutableStateOf(state.homeTeam) }
     var awayTeam by remember { mutableStateOf(state.awayTeam) }
-    var halfLength by remember { mutableIntStateOf(state.halfLengthMinutes) }
     var ageGroup by remember { mutableStateOf(state.ageGroup) }
     var sinBinMinutes by remember { mutableIntStateOf(state.sinBinMinutes) }
     var competitionType by remember { mutableStateOf(state.competitionType) }
@@ -63,7 +62,6 @@ fun SetupScreen(viewModel: MatchViewModel, onStartMatch: () -> Unit, onShowHisto
                 onSelect = { group ->
                     ageGroup = group
                     sinBinMinutes = group.sinBinMinutes
-                    halfLength = group.defaultHalfMinutes
                 }
             )
         }
@@ -85,16 +83,6 @@ fun SetupScreen(viewModel: MatchViewModel, onStartMatch: () -> Unit, onShowHisto
             }
         }
 
-        item { FieldLabel("Half Length") }
-        item {
-            StepperRow(
-                value = halfLength,
-                label = "$halfLength min",
-                onDecrement = { if (halfLength > 10) halfLength-- },
-                onIncrement = { if (halfLength < 60) halfLength++ }
-            )
-        }
-
         item { FieldLabel("Sin Bin Duration") }
         item {
             StepperRow(
@@ -111,7 +99,7 @@ fun SetupScreen(viewModel: MatchViewModel, onStartMatch: () -> Unit, onShowHisto
             Chip(
                 label = { Text("START MATCH", fontWeight = FontWeight.Bold) },
                 onClick = {
-                    viewModel.updateSetup(homeTeam, awayTeam, halfLength, ageGroup, sinBinMinutes, competitionType)
+                    viewModel.updateSetup(homeTeam, awayTeam, ageGroup.defaultHalfMinutes, ageGroup, sinBinMinutes, competitionType)
                     viewModel.startMatch()
                     onStartMatch()
                 },

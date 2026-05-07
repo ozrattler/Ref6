@@ -83,6 +83,14 @@ class MainActivity : ComponentActivity() {
                                     )
                                 )
                             }
+                            is MatchUiEvent.HalfTimeCountdownExpired -> {
+                                vibrator?.vibrate(
+                                    VibrationEffect.createWaveform(
+                                        longArrayOf(0, 500, 150, 500, 150, 500, 150, 500, 150, 500),
+                                        -1
+                                    )
+                                )
+                            }
                         }
                     }
                 }

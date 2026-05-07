@@ -39,6 +39,6 @@ class MatchStorage(context: Context) {
     }
 
     companion object {
-        private const val MAX_MATCHES = 3
+        private const val MAX_MATCHES = 5
     }
 }

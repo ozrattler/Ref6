@@ -8,7 +8,6 @@ enum class EventType { GOAL, YELLOW_CARD, RED_CARD, SIN_BIN }
 
 enum class AgeGroup(val label: String, val sinBinMinutes: Int, val defaultHalfMinutes: Int) {
     OPEN_SENIOR("Open/Senior", 10, 45),
-    U18("U18", 10, 45),
     U16("U16", 5, 35),
     U15("U15", 5, 35),
     U14("U14", 5, 30),

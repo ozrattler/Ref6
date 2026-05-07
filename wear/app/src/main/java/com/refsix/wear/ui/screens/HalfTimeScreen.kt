@@ -18,6 +18,7 @@ import com.refsix.wear.viewmodel.MatchViewModel
 @Composable
 fun HalfTimeScreen(viewModel: MatchViewModel, onStartSecondHalf: () -> Unit) {
     val state by viewModel.state.collectAsState()
+    val countdown by viewModel.halfTimeCountdown.collectAsState()
 
     val firstHalfEvents = state.events
         .filter { it.half == 1 }
@@ -54,6 +55,30 @@ fun HalfTimeScreen(viewModel: MatchViewModel, onStartSecondHalf: () -> Unit) {
             ) {
                 Text(state.homeTeam, style = MaterialTheme.typography.caption1, color = Color.Gray)
                 Text(state.awayTeam, style = MaterialTheme.typography.caption1, color = Color.Gray)
+            }
+        }
+
+        item {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.padding(vertical = 2.dp)
+            ) {
+                Text(
+                    text = if (countdown == 0) "BREAK OVER" else "HT BREAK",
+                    style = MaterialTheme.typography.caption2,
+                    color = Color.Gray
+                )
+                Text(
+                    text = "%02d:%02d".format(countdown / 60, countdown % 60),
+                    fontSize = 30.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = when {
+                        countdown == 0 -> Color.Gray
+                        countdown <= 60 -> RefRed
+                        countdown <= 120 -> RefYellow
+                        else -> Color.White
+                    }
+                )
             }
         }
 
