@@ -46,12 +46,16 @@ export default function MatchSetup() {
   function applyTemplate(t) {
     setForm(f => ({
       ...f,
+      // match-specific fields always reset to blank
+      venue:          '',
+      kickoffDate:    '',
+      kickoffTime:    '',
+      homeTeam:       '',
+      homeColour:     '#dc2626',
+      awayTeam:       '',
+      awayColour:     '#2563eb',
+      // competition rules & settings from template
       competition:    t.competition      || '',
-      venue:          t.venue            || '',
-      homeTeam:       t.home_team        || '',
-      homeColour:     t.home_colour      || '#dc2626',
-      awayTeam:       t.away_team        || '',
-      awayColour:     t.away_colour      || '#2563eb',
       ageGroup:       t.age_group        || 'Open / Senior',
       halfLength:     t.half_length      || 45,
       dissentSinBin:  t.dissent_sin_bin  ?? true,
@@ -71,10 +75,6 @@ export default function MatchSetup() {
       await pb.collection('templates').create({
         name:             templateName.trim(),
         competition:      form.competition,
-        home_team:        form.homeTeam,
-        away_team:        form.awayTeam,
-        home_colour:      form.homeColour,
-        away_colour:      form.awayColour,
         age_group:        form.ageGroup,
         half_length:      form.halfLength,
         two_yellows_rule: 'red_card',
@@ -83,7 +83,6 @@ export default function MatchSetup() {
         ar1:              form.ar1,
         ar2:              form.ar2,
         fourth_official:  form.fourthOfficial,
-        venue:            form.venue,
       })
       fetchTemplates()
       setTemplateName('')

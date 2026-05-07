@@ -57,8 +57,11 @@ export default function Fixtures() {
 
   useEffect(() => {
     pb.collection('match_setups')
-      .getList(1, 200, { filter: 'status = "pending"', sort: 'kickoff_date,kickoff_time' })
-      .then(r => { setFixtures(r.items); setLoading(false) })
+      .getList(1, 200, { sort: 'kickoff_date,kickoff_time' })
+      .then(r => {
+        setFixtures(r.items.filter(f => !f.status || f.status === 'pending'))
+        setLoading(false)
+      })
       .catch(e => { setError(e.message); setLoading(false) })
   }, [])
 
