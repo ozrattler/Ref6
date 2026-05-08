@@ -1,6 +1,7 @@
 package com.refsix.wear.viewmodel
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.refsix.wear.data.AgeGroup
@@ -68,7 +69,7 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
     init {
         launchTimer()
         viewModelScope.launch { syncUnsyncedMatches() }
-        viewModelScope.launch { refreshPendingSetup() }
+        refreshPendingSetup()
     }
 
     private fun launchTimer() {
@@ -211,8 +212,12 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
 
     fun refreshPendingSetup() {
         viewModelScope.launch {
-            if (!pocketBaseSync.isWifiConnected()) return@launch
-            _pendingSetup.value = pocketBaseSync.fetchPendingMatchSetup()
+            val hasNetwork = pocketBaseSync.isNetworkAvailable()
+            Log.d("MatchViewModel", "refreshPendingSetup: hasNetwork=$hasNetwork")
+            if (!hasNetwork) return@launch
+            val setup = pocketBaseSync.fetchPendingMatchSetup()
+            Log.d("MatchViewModel", "refreshPendingSetup: setup=$setup")
+            _pendingSetup.value = setup
         }
     }
 

@@ -3,16 +3,20 @@ package com.refsix.wear.data
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
+import java.net.URLEncoder
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
+
+private const val TAG = "PocketBaseSync"
 
 data class MatchSetupData(
     val id: String,
@@ -32,31 +36,61 @@ class PocketBaseSync(private val context: Context) {
         timeZone = TimeZone.getTimeZone("UTC")
     }
 
+    // True if any usable network is available (WiFi or Bluetooth bridge via phone).
+    // Wear OS often routes traffic through the paired phone over Bluetooth, so checking
+    // for TRANSPORT_WIFI alone would always fail when tethered.
+    fun isNetworkAvailable(): Boolean {
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val network = cm.activeNetwork ?: run {
+            Log.d(TAG, "isNetworkAvailable: no active network")
+            return false
+        }
+        val caps = cm.getNetworkCapabilities(network) ?: run {
+            Log.d(TAG, "isNetworkAvailable: no capabilities")
+            return false
+        }
+        val wifi = caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
+        val bt   = caps.hasTransport(NetworkCapabilities.TRANSPORT_BLUETOOTH)
+        val cell = caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)
+        Log.d(TAG, "isNetworkAvailable: wifi=$wifi bt=$bt cell=$cell")
+        return wifi || bt || cell
+    }
+
+    // Kept for sync gating (matches sync best over direct WiFi).
     fun isWifiConnected(): Boolean {
         val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        val network = cm.activeNetwork ?: return false
-        val caps = cm.getNetworkCapabilities(network) ?: return false
+        val caps = cm.getNetworkCapabilities(cm.activeNetwork ?: return false) ?: return false
         return caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
     }
 
     suspend fun fetchPendingMatchSetup(): MatchSetupData? = withContext(Dispatchers.IO) {
         try {
-            val url = "$baseUrl/match_setups/records?filter=(status='pending')&sort=-created&perPage=1"
+            val filter = URLEncoder.encode("(status='pending')", "UTF-8")
+            val url = "$baseUrl/match_setups/records?filter=$filter&sort=-created&perPage=1"
+            Log.d(TAG, "fetchPendingMatchSetup: GET $url")
             val conn = URL(url).openConnection() as HttpURLConnection
             conn.requestMethod = "GET"
             conn.connectTimeout = 5_000
             conn.readTimeout = 5_000
-            if (conn.responseCode !in 200..299) return@withContext null
-            val json = JSONObject(conn.inputStream.bufferedReader().readText())
+            val code = conn.responseCode
+            Log.d(TAG, "fetchPendingMatchSetup: HTTP $code")
+            if (code !in 200..299) {
+                Log.w(TAG, "fetchPendingMatchSetup: error body=${conn.errorStream?.bufferedReader()?.readText()}")
+                return@withContext null
+            }
+            val body = conn.inputStream.bufferedReader().readText()
             conn.disconnect()
+            Log.d(TAG, "fetchPendingMatchSetup: body=$body")
+            val json = JSONObject(body)
             val items = json.getJSONArray("items")
+            Log.d(TAG, "fetchPendingMatchSetup: totalItems=${json.optInt("totalItems")} items=${items.length()}")
             if (items.length() == 0) return@withContext null
             val item = items.getJSONObject(0)
             val ageGroup = parseAgeGroup(item.optString("age_group", ""))
             val competition = item.optString("competition", "")
             val compType = if (competition.contains("SPL", ignoreCase = true))
                 CompetitionType.SPL else CompetitionType.STANDARD
-            MatchSetupData(
+            val setup = MatchSetupData(
                 id = item.getString("id"),
                 homeTeam = item.optString("home_team", ""),
                 awayTeam = item.optString("away_team", ""),
@@ -66,14 +100,19 @@ class PocketBaseSync(private val context: Context) {
                 sinBinMinutes = ageGroup.sinBinMinutes,
                 competition = competition
             )
-        } catch (_: Exception) {
+            Log.d(TAG, "fetchPendingMatchSetup: parsed setup=$setup")
+            setup
+        } catch (e: Exception) {
+            Log.e(TAG, "fetchPendingMatchSetup: exception", e)
             null
         }
     }
 
     suspend fun markMatchSetupLoaded(id: String) = withContext(Dispatchers.IO) {
         try {
-            val conn = URL("$baseUrl/match_setups/records/$id").openConnection() as HttpURLConnection
+            val url = "$baseUrl/match_setups/records/$id"
+            Log.d(TAG, "markMatchSetupLoaded: PATCH $url")
+            val conn = URL(url).openConnection() as HttpURLConnection
             conn.requestMethod = "PATCH"
             conn.setRequestProperty("Content-Type", "application/json")
             conn.doOutput = true
@@ -82,9 +121,12 @@ class PocketBaseSync(private val context: Context) {
             OutputStreamWriter(conn.outputStream).use {
                 it.write(JSONObject().apply { put("status", "loaded") }.toString())
             }
-            conn.responseCode
+            val code = conn.responseCode
+            Log.d(TAG, "markMatchSetupLoaded: HTTP $code")
             conn.disconnect()
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            Log.e(TAG, "markMatchSetupLoaded: exception", e)
+        }
     }
 
     // Returns the PocketBase record ID on success, null on failure.
@@ -100,8 +142,10 @@ class PocketBaseSync(private val context: Context) {
                 put("half_length", match.halfLengthMinutes)
                 put("status", "completed")
             }
+            Log.d(TAG, "syncMatch: posting match ${match.homeTeam} vs ${match.awayTeam}")
             val pbMatchId = postJson("$baseUrl/matches/records", matchBody)
                 ?: return@withContext null
+            Log.d(TAG, "syncMatch: match created id=$pbMatchId, posting ${match.events.size} events")
 
             match.events.forEach { event ->
                 val incidentBody = JSONObject().apply {
@@ -116,8 +160,10 @@ class PocketBaseSync(private val context: Context) {
                 }
                 postJson("$baseUrl/incidents/records", incidentBody)
             }
+            Log.d(TAG, "syncMatch: done id=$pbMatchId")
             pbMatchId
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Log.e(TAG, "syncMatch: exception", e)
             null
         }
     }
