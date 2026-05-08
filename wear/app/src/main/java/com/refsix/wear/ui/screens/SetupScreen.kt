@@ -21,18 +21,31 @@ import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.material.*
 import com.refsix.wear.data.AgeGroup
 import com.refsix.wear.data.CompetitionType
+import com.refsix.wear.data.MatchSetupData
 import com.refsix.wear.ui.theme.*
 import com.refsix.wear.viewmodel.MatchViewModel
 
 @Composable
 fun SetupScreen(viewModel: MatchViewModel, onStartMatch: () -> Unit, onShowHistory: () -> Unit = {}) {
     val state by viewModel.state.collectAsState()
+    val pendingSetup by viewModel.pendingSetup.collectAsState()
 
     var homeTeam by remember { mutableStateOf(state.homeTeam) }
     var awayTeam by remember { mutableStateOf(state.awayTeam) }
     var ageGroup by remember { mutableStateOf(state.ageGroup) }
     var sinBinMinutes by remember { mutableIntStateOf(state.sinBinMinutes) }
     var competitionType by remember { mutableStateOf(state.competitionType) }
+    var halfLengthMinutes by remember { mutableIntStateOf(state.halfLengthMinutes) }
+
+    fun applySetup(setup: MatchSetupData) {
+        homeTeam = setup.homeTeam.ifBlank { "Home" }
+        awayTeam = setup.awayTeam.ifBlank { "Away" }
+        ageGroup = setup.ageGroup
+        sinBinMinutes = setup.sinBinMinutes
+        competitionType = setup.competitionType
+        halfLengthMinutes = setup.halfLengthMinutes
+        viewModel.applyMatchSetup(setup)
+    }
 
     ScalingLazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -49,6 +62,24 @@ fun SetupScreen(viewModel: MatchViewModel, onStartMatch: () -> Unit, onShowHisto
             )
         }
 
+        if (pendingSetup != null) {
+            item {
+                val setup = pendingSetup!!
+                Chip(
+                    label = { Text("LOAD SETUP", fontWeight = FontWeight.Bold, fontSize = 12.sp) },
+                    secondaryLabel = {
+                        Text(
+                            text = "${setup.homeTeam.ifBlank { "?" }} vs ${setup.awayTeam.ifBlank { "?" }}",
+                            fontSize = 10.sp
+                        )
+                    },
+                    onClick = { applySetup(setup) },
+                    colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF1B4D1B)),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+
         item { FieldLabel("Home Team") }
         item { TeamNameField(value = homeTeam, onValueChange = { homeTeam = it }) }
 
@@ -62,6 +93,7 @@ fun SetupScreen(viewModel: MatchViewModel, onStartMatch: () -> Unit, onShowHisto
                 onSelect = { group ->
                     ageGroup = group
                     sinBinMinutes = group.sinBinMinutes
+                    halfLengthMinutes = group.defaultHalfMinutes
                 }
             )
         }
@@ -99,7 +131,7 @@ fun SetupScreen(viewModel: MatchViewModel, onStartMatch: () -> Unit, onShowHisto
             Chip(
                 label = { Text("START MATCH", fontWeight = FontWeight.Bold) },
                 onClick = {
-                    viewModel.updateSetup(homeTeam, awayTeam, ageGroup.defaultHalfMinutes, ageGroup, sinBinMinutes, competitionType)
+                    viewModel.updateSetup(homeTeam, awayTeam, halfLengthMinutes, ageGroup, sinBinMinutes, competitionType)
                     viewModel.startMatch()
                     onStartMatch()
                 },

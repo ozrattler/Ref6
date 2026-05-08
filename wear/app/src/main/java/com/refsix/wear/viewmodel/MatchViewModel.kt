@@ -14,6 +14,7 @@ import com.refsix.wear.data.MatchPhase
 import com.refsix.wear.data.MatchState
 import com.refsix.wear.data.MatchStorage
 import com.refsix.wear.data.Offences
+import com.refsix.wear.data.MatchSetupData
 import com.refsix.wear.data.PocketBaseSync
 import com.refsix.wear.data.SavedMatch
 import com.refsix.wear.data.SinBinEntry
@@ -56,6 +57,9 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
     private val _savedMatches = MutableStateFlow(matchStorage.loadMatches())
     val savedMatches: StateFlow<List<SavedMatch>> = _savedMatches.asStateFlow()
 
+    private val _pendingSetup = MutableStateFlow<MatchSetupData?>(null)
+    val pendingSetup: StateFlow<MatchSetupData?> = _pendingSetup.asStateFlow()
+
     private val _uiEvents = MutableSharedFlow<MatchUiEvent>(extraBufferCapacity = 16)
     val uiEvents: SharedFlow<MatchUiEvent> = _uiEvents.asSharedFlow()
 
@@ -64,6 +68,7 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
     init {
         launchTimer()
         viewModelScope.launch { syncUnsyncedMatches() }
+        viewModelScope.launch { refreshPendingSetup() }
     }
 
     private fun launchTimer() {
@@ -148,6 +153,12 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
         startHalfTimeCountdown()
     }
 
+    fun ensureHalfTimeCountdown() {
+        if (halfTimeCountdownJob?.isActive == true) return  // already running
+        if (halfTimeCountdownJob != null) return            // already completed
+        if (_state.value.phase == MatchPhase.HALF_TIME) startHalfTimeCountdown()
+    }
+
     private fun startHalfTimeCountdown() {
         halfTimeCountdownJob?.cancel()
         halfTimeCountdownJob = viewModelScope.launch {
@@ -196,6 +207,22 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
                 _savedMatches.value = matchStorage.loadMatches()
             }
         }
+    }
+
+    fun refreshPendingSetup() {
+        viewModelScope.launch {
+            if (!pocketBaseSync.isWifiConnected()) return@launch
+            _pendingSetup.value = pocketBaseSync.fetchPendingMatchSetup()
+        }
+    }
+
+    fun applyMatchSetup(setup: MatchSetupData) {
+        _pendingSetup.value = null
+        viewModelScope.launch { pocketBaseSync.markMatchSetupLoaded(setup.id) }
+    }
+
+    fun dismissPendingSetup() {
+        _pendingSetup.value = null
     }
 
     fun recordGoal(team: String, scorerNumber: String = "", scorerName: String = "") {

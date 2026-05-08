@@ -14,6 +14,17 @@ import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 
+data class MatchSetupData(
+    val id: String,
+    val homeTeam: String,
+    val awayTeam: String,
+    val halfLengthMinutes: Int,
+    val ageGroup: AgeGroup,
+    val competitionType: CompetitionType,
+    val sinBinMinutes: Int,
+    val competition: String
+)
+
 class PocketBaseSync(private val context: Context) {
 
     private val baseUrl = "http://192.168.1.106:8090/api/collections"
@@ -26,6 +37,54 @@ class PocketBaseSync(private val context: Context) {
         val network = cm.activeNetwork ?: return false
         val caps = cm.getNetworkCapabilities(network) ?: return false
         return caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
+    }
+
+    suspend fun fetchPendingMatchSetup(): MatchSetupData? = withContext(Dispatchers.IO) {
+        try {
+            val url = "$baseUrl/match_setups/records?filter=(status='pending')&sort=-created&perPage=1"
+            val conn = URL(url).openConnection() as HttpURLConnection
+            conn.requestMethod = "GET"
+            conn.connectTimeout = 5_000
+            conn.readTimeout = 5_000
+            if (conn.responseCode !in 200..299) return@withContext null
+            val json = JSONObject(conn.inputStream.bufferedReader().readText())
+            conn.disconnect()
+            val items = json.getJSONArray("items")
+            if (items.length() == 0) return@withContext null
+            val item = items.getJSONObject(0)
+            val ageGroup = parseAgeGroup(item.optString("age_group", ""))
+            val competition = item.optString("competition", "")
+            val compType = if (competition.contains("SPL", ignoreCase = true))
+                CompetitionType.SPL else CompetitionType.STANDARD
+            MatchSetupData(
+                id = item.getString("id"),
+                homeTeam = item.optString("home_team", ""),
+                awayTeam = item.optString("away_team", ""),
+                halfLengthMinutes = item.optInt("half_length", ageGroup.defaultHalfMinutes),
+                ageGroup = ageGroup,
+                competitionType = compType,
+                sinBinMinutes = ageGroup.sinBinMinutes,
+                competition = competition
+            )
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    suspend fun markMatchSetupLoaded(id: String) = withContext(Dispatchers.IO) {
+        try {
+            val conn = URL("$baseUrl/match_setups/records/$id").openConnection() as HttpURLConnection
+            conn.requestMethod = "PATCH"
+            conn.setRequestProperty("Content-Type", "application/json")
+            conn.doOutput = true
+            conn.connectTimeout = 5_000
+            conn.readTimeout = 5_000
+            OutputStreamWriter(conn.outputStream).use {
+                it.write(JSONObject().apply { put("status", "loaded") }.toString())
+            }
+            conn.responseCode
+            conn.disconnect()
+        } catch (_: Exception) {}
     }
 
     // Returns the PocketBase record ID on success, null on failure.
@@ -61,6 +120,14 @@ class PocketBaseSync(private val context: Context) {
         } catch (_: Exception) {
             null
         }
+    }
+
+    private fun parseAgeGroup(str: String): AgeGroup = when {
+        str.contains("U16", ignoreCase = true) -> AgeGroup.U16
+        str.contains("U15", ignoreCase = true) -> AgeGroup.U15
+        str.contains("U14", ignoreCase = true) -> AgeGroup.U14
+        str.contains("U12", ignoreCase = true) -> AgeGroup.U12
+        else -> AgeGroup.OPEN_SENIOR
     }
 
     private fun postJson(url: String, body: JSONObject): String? {

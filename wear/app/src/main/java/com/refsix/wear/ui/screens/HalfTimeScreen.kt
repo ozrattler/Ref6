@@ -20,6 +20,8 @@ fun HalfTimeScreen(viewModel: MatchViewModel, onStartSecondHalf: () -> Unit) {
     val state by viewModel.state.collectAsState()
     val countdown by viewModel.halfTimeCountdown.collectAsState()
 
+    LaunchedEffect(Unit) { viewModel.ensureHalfTimeCountdown() }
+
     val firstHalfEvents = state.events
         .filter { it.half == 1 }
         .sortedBy { it.matchMinute }
