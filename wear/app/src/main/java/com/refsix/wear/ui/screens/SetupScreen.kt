@@ -114,30 +114,13 @@ fun SetupScreen(
             )
         }
 
-        item { FieldLabel("Competition") }
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                CompetitionChip(
-                    label = "Standard",
-                    selected = competitionType == CompetitionType.STANDARD,
-                    onClick = { competitionType = CompetitionType.STANDARD }
-                )
-                CompetitionChip(
-                    label = "SPL",
-                    selected = competitionType == CompetitionType.SPL,
-                    activeColor = Color(0xFF1565C0),
-                    onClick = { competitionType = CompetitionType.SPL }
-                )
-            }
-        }
-
-        item { FieldLabel("Sin Bin Duration") }
+        item { FieldLabel("Half Length") }
         item {
             StepperRow(
-                value = sinBinMinutes,
-                label = "$sinBinMinutes min",
-                onDecrement = { if (sinBinMinutes > 1) sinBinMinutes-- },
-                onIncrement = { if (sinBinMinutes < 30) sinBinMinutes++ }
+                value = halfLengthMinutes,
+                label = "$halfLengthMinutes min",
+                onDecrement = { if (halfLengthMinutes > 10) halfLengthMinutes-- },
+                onIncrement = { if (halfLengthMinutes < 60) halfLengthMinutes++ }
             )
         }
 
@@ -245,23 +228,6 @@ private fun AgeGroupChip(label: String, selected: Boolean, onClick: () -> Unit, 
             textAlign = TextAlign.Center
         )
     }
-}
-
-@Composable
-private fun CompetitionChip(
-    label: String,
-    selected: Boolean,
-    activeColor: Color = RefGreen,
-    onClick: () -> Unit
-) {
-    CompactChip(
-        label = { Text(label, fontWeight = FontWeight.Bold) },
-        onClick = onClick,
-        colors = if (selected)
-            ChipDefaults.chipColors(backgroundColor = activeColor)
-        else
-            ChipDefaults.chipColors(backgroundColor = Color(0xFF333333))
-    )
 }
 
 @Composable
