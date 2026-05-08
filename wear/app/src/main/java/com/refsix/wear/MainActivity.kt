@@ -17,12 +17,18 @@ import androidx.navigation.navArgument
 import androidx.wear.compose.navigation.SwipeDismissableNavHost
 import androidx.wear.compose.navigation.composable
 import androidx.wear.compose.navigation.rememberSwipeDismissableNavController
+import com.refsix.wear.data.MatchPhase
 import com.refsix.wear.ui.screens.*
 import com.refsix.wear.ui.theme.Ref6Theme
 import com.refsix.wear.viewmodel.MatchUiEvent
 import com.refsix.wear.viewmodel.MatchViewModel
 
 class MainActivity : ComponentActivity() {
+
+    override fun onStop() {
+        super.onStop()
+        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -39,6 +45,7 @@ class MainActivity : ComponentActivity() {
                 val navController = rememberSwipeDismissableNavController()
                 val matchViewModel: MatchViewModel = viewModel()
                 val state by matchViewModel.state.collectAsState()
+                val halfTimeCountdown by matchViewModel.halfTimeCountdown.collectAsState()
 
                 // Track current route to disable swipe-to-dismiss on report screens
                 val backStack by navController.currentBackStack.collectAsState()
@@ -46,9 +53,13 @@ class MainActivity : ComponentActivity() {
                 val swipeEnabled = currentRoute != "fullTime" &&
                     currentRoute != "report/{index}"
 
-                // Keep screen on while the match clock is running
-                LaunchedEffect(state.isRunning) {
-                    if (state.isRunning) {
+                // Screen on while clock is running or half-time countdown is ticking.
+                // Cleared when paused, at full time, or when the app goes to background
+                // (onStop clears the flag unconditionally; LaunchedEffect re-applies on resume).
+                val keepScreenOn = state.isRunning ||
+                    (state.phase == MatchPhase.HALF_TIME && halfTimeCountdown > 0)
+                LaunchedEffect(keepScreenOn) {
+                    if (keepScreenOn) {
                         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                     } else {
                         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
