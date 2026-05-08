@@ -63,48 +63,46 @@ class PocketBaseSync(private val context: Context) {
         return caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
     }
 
-    suspend fun fetchPendingMatchSetup(): MatchSetupData? = withContext(Dispatchers.IO) {
+    suspend fun fetchPendingMatchSetups(): List<MatchSetupData> = withContext(Dispatchers.IO) {
         try {
             val filter = URLEncoder.encode("(status='pending')", "UTF-8")
-            val url = "$baseUrl/match_setups/records?filter=$filter&sort=-created&perPage=1"
-            Log.d(TAG, "fetchPendingMatchSetup: GET $url")
+            val url = "$baseUrl/match_setups/records?filter=$filter&sort=-created&perPage=50"
+            Log.d(TAG, "fetchPendingMatchSetups: GET $url")
             val conn = URL(url).openConnection() as HttpURLConnection
             conn.requestMethod = "GET"
             conn.connectTimeout = 5_000
             conn.readTimeout = 5_000
             val code = conn.responseCode
-            Log.d(TAG, "fetchPendingMatchSetup: HTTP $code")
+            Log.d(TAG, "fetchPendingMatchSetups: HTTP $code")
             if (code !in 200..299) {
-                Log.w(TAG, "fetchPendingMatchSetup: error body=${conn.errorStream?.bufferedReader()?.readText()}")
-                return@withContext null
+                Log.w(TAG, "fetchPendingMatchSetups: error body=${conn.errorStream?.bufferedReader()?.readText()}")
+                return@withContext emptyList()
             }
             val body = conn.inputStream.bufferedReader().readText()
             conn.disconnect()
-            Log.d(TAG, "fetchPendingMatchSetup: body=$body")
             val json = JSONObject(body)
             val items = json.getJSONArray("items")
-            Log.d(TAG, "fetchPendingMatchSetup: totalItems=${json.optInt("totalItems")} items=${items.length()}")
-            if (items.length() == 0) return@withContext null
-            val item = items.getJSONObject(0)
-            val ageGroup = parseAgeGroup(item.optString("age_group", ""))
-            val competition = item.optString("competition", "")
-            val compType = if (competition.contains("SPL", ignoreCase = true))
-                CompetitionType.SPL else CompetitionType.STANDARD
-            val setup = MatchSetupData(
-                id = item.getString("id"),
-                homeTeam = item.optString("home_team", ""),
-                awayTeam = item.optString("away_team", ""),
-                halfLengthMinutes = item.optInt("half_length", ageGroup.defaultHalfMinutes),
-                ageGroup = ageGroup,
-                competitionType = compType,
-                sinBinMinutes = ageGroup.sinBinMinutes,
-                competition = competition
-            )
-            Log.d(TAG, "fetchPendingMatchSetup: parsed setup=$setup")
-            setup
+            Log.d(TAG, "fetchPendingMatchSetups: totalItems=${json.optInt("totalItems")} returned=${items.length()}")
+            (0 until items.length()).map { i ->
+                val item = items.getJSONObject(i)
+                val ageGroup = parseAgeGroup(item.optString("age_group", ""))
+                val competition = item.optString("competition", "")
+                val compType = if (competition.contains("SPL", ignoreCase = true))
+                    CompetitionType.SPL else CompetitionType.STANDARD
+                MatchSetupData(
+                    id = item.getString("id"),
+                    homeTeam = item.optString("home_team", ""),
+                    awayTeam = item.optString("away_team", ""),
+                    halfLengthMinutes = item.optInt("half_length", ageGroup.defaultHalfMinutes),
+                    ageGroup = ageGroup,
+                    competitionType = compType,
+                    sinBinMinutes = ageGroup.sinBinMinutes,
+                    competition = competition
+                )
+            }
         } catch (e: Exception) {
-            Log.e(TAG, "fetchPendingMatchSetup: exception", e)
-            null
+            Log.e(TAG, "fetchPendingMatchSetups: exception", e)
+            emptyList()
         }
     }
 

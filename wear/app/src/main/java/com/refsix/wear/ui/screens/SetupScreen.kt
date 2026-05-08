@@ -21,14 +21,19 @@ import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.material.*
 import com.refsix.wear.data.AgeGroup
 import com.refsix.wear.data.CompetitionType
-import com.refsix.wear.data.MatchSetupData
 import com.refsix.wear.ui.theme.*
 import com.refsix.wear.viewmodel.MatchViewModel
 
 @Composable
-fun SetupScreen(viewModel: MatchViewModel, onStartMatch: () -> Unit, onShowHistory: () -> Unit = {}) {
+fun SetupScreen(
+    viewModel: MatchViewModel,
+    onStartMatch: () -> Unit,
+    onShowHistory: () -> Unit = {},
+    onShowSetupList: () -> Unit = {}
+) {
     val state by viewModel.state.collectAsState()
-    val pendingSetup by viewModel.pendingSetup.collectAsState()
+    val pendingSetups by viewModel.pendingSetups.collectAsState()
+    val appliedSetup by viewModel.appliedSetup.collectAsState()
 
     var homeTeam by remember { mutableStateOf(state.homeTeam) }
     var awayTeam by remember { mutableStateOf(state.awayTeam) }
@@ -37,14 +42,17 @@ fun SetupScreen(viewModel: MatchViewModel, onStartMatch: () -> Unit, onShowHisto
     var competitionType by remember { mutableStateOf(state.competitionType) }
     var halfLengthMinutes by remember { mutableIntStateOf(state.halfLengthMinutes) }
 
-    fun applySetup(setup: MatchSetupData) {
-        homeTeam = setup.homeTeam.ifBlank { "Home" }
-        awayTeam = setup.awayTeam.ifBlank { "Away" }
-        ageGroup = setup.ageGroup
-        sinBinMinutes = setup.sinBinMinutes
-        competitionType = setup.competitionType
-        halfLengthMinutes = setup.halfLengthMinutes
-        viewModel.applyMatchSetup(setup)
+    // Fires when the user returns from the list screen having chosen a setup.
+    LaunchedEffect(appliedSetup) {
+        appliedSetup?.let { setup ->
+            homeTeam = setup.homeTeam.ifBlank { "Home" }
+            awayTeam = setup.awayTeam.ifBlank { "Away" }
+            ageGroup = setup.ageGroup
+            sinBinMinutes = setup.sinBinMinutes
+            competitionType = setup.competitionType
+            halfLengthMinutes = setup.halfLengthMinutes
+            viewModel.consumeAppliedSetup()
+        }
     }
 
     ScalingLazyColumn(
@@ -62,18 +70,26 @@ fun SetupScreen(viewModel: MatchViewModel, onStartMatch: () -> Unit, onShowHisto
             )
         }
 
-        if (pendingSetup != null) {
+        if (pendingSetups.isNotEmpty()) {
             item {
-                val setup = pendingSetup!!
+                val count = pendingSetups.size
                 Chip(
-                    label = { Text("LOAD SETUP", fontWeight = FontWeight.Bold, fontSize = 12.sp) },
-                    secondaryLabel = {
+                    label = {
                         Text(
-                            text = "${setup.homeTeam.ifBlank { "?" }} vs ${setup.awayTeam.ifBlank { "?" }}",
+                            text = if (count == 1) "LOAD SETUP" else "LOAD SETUP ($count)",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
+                        )
+                    },
+                    secondaryLabel = {
+                        val s = pendingSetups.first()
+                        Text(
+                            text = "${s.homeTeam.ifBlank { "?" }} vs ${s.awayTeam.ifBlank { "?" }}" +
+                                if (count > 1) " …" else "",
                             fontSize = 10.sp
                         )
                     },
-                    onClick = { applySetup(setup) },
+                    onClick = onShowSetupList,
                     colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF1B4D1B)),
                     modifier = Modifier.fillMaxWidth()
                 )

@@ -58,8 +58,13 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
     private val _savedMatches = MutableStateFlow(matchStorage.loadMatches())
     val savedMatches: StateFlow<List<SavedMatch>> = _savedMatches.asStateFlow()
 
-    private val _pendingSetup = MutableStateFlow<MatchSetupData?>(null)
-    val pendingSetup: StateFlow<MatchSetupData?> = _pendingSetup.asStateFlow()
+    private val _pendingSetups = MutableStateFlow<List<MatchSetupData>>(emptyList())
+    val pendingSetups: StateFlow<List<MatchSetupData>> = _pendingSetups.asStateFlow()
+
+    // One-shot signal: SetupScreen watches this to apply local form fields after
+    // returning from the list screen. Cleared by consumeAppliedSetup().
+    private val _appliedSetup = MutableStateFlow<MatchSetupData?>(null)
+    val appliedSetup: StateFlow<MatchSetupData?> = _appliedSetup.asStateFlow()
 
     private val _uiEvents = MutableSharedFlow<MatchUiEvent>(extraBufferCapacity = 16)
     val uiEvents: SharedFlow<MatchUiEvent> = _uiEvents.asSharedFlow()
@@ -215,19 +220,24 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
             val hasNetwork = pocketBaseSync.isNetworkAvailable()
             Log.d("MatchViewModel", "refreshPendingSetup: hasNetwork=$hasNetwork")
             if (!hasNetwork) return@launch
-            val setup = pocketBaseSync.fetchPendingMatchSetup()
-            Log.d("MatchViewModel", "refreshPendingSetup: setup=$setup")
-            _pendingSetup.value = setup
+            val setups = pocketBaseSync.fetchPendingMatchSetups()
+            Log.d("MatchViewModel", "refreshPendingSetup: ${setups.size} pending setups")
+            _pendingSetups.value = setups
         }
     }
 
     fun applyMatchSetup(setup: MatchSetupData) {
-        _pendingSetup.value = null
+        _pendingSetups.update { it.filterNot { s -> s.id == setup.id } }
+        _appliedSetup.value = setup
         viewModelScope.launch { pocketBaseSync.markMatchSetupLoaded(setup.id) }
     }
 
-    fun dismissPendingSetup() {
-        _pendingSetup.value = null
+    fun consumeAppliedSetup() {
+        _appliedSetup.value = null
+    }
+
+    fun dismissPendingSetups() {
+        _pendingSetups.value = emptyList()
     }
 
     fun recordGoal(team: String, scorerNumber: String = "", scorerName: String = "") {

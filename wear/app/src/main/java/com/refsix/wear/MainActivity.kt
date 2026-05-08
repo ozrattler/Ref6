@@ -110,7 +110,18 @@ class MainActivity : ComponentActivity() {
                             },
                             onShowHistory = {
                                 navController.navigate("history")
+                            },
+                            onShowSetupList = {
+                                navController.navigate("setupList")
                             }
+                        )
+                    }
+
+                    composable("setupList") {
+                        MatchSetupListScreen(
+                            viewModel = matchViewModel,
+                            onSetupSelected = { navController.popBackStack() },
+                            onCancel = { navController.popBackStack() }
                         )
                     }
 
