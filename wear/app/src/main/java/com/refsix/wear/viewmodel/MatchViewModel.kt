@@ -113,22 +113,11 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
 
     fun signalReturnToCenter() { _returnToCenterCount.update { it + 1 } }
 
-    fun updateSetup(
-        homeTeam: String,
-        awayTeam: String,
-        halfLengthMinutes: Int,
-        ageGroup: AgeGroup,
-        sinBinMinutes: Int,
-        competitionType: CompetitionType
-    ) {
+    fun updateSetup(homeTeam: String, awayTeam: String) {
         _state.update {
             it.copy(
                 homeTeam = homeTeam.ifBlank { "Home" },
-                awayTeam = awayTeam.ifBlank { "Away" },
-                halfLengthMinutes = halfLengthMinutes.coerceIn(10, 60),
-                ageGroup = ageGroup,
-                competitionType = competitionType,
-                sinBinMinutes = sinBinMinutes.coerceIn(1, 30)
+                awayTeam = awayTeam.ifBlank { "Away" }
             )
         }
     }
@@ -229,6 +218,16 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
     fun applyMatchSetup(setup: MatchSetupData) {
         _pendingSetups.update { it.filterNot { s -> s.id == setup.id } }
         _appliedSetup.value = setup
+        // Write template fields directly into match state so they survive
+        // without needing local vars on the (now simplified) setup screen.
+        _state.update {
+            it.copy(
+                ageGroup = setup.ageGroup,
+                halfLengthMinutes = setup.halfLengthMinutes,
+                competitionType = setup.competitionType,
+                sinBinMinutes = setup.sinBinMinutes
+            )
+        }
         viewModelScope.launch { pocketBaseSync.markMatchSetupLoaded(setup.id) }
     }
 
