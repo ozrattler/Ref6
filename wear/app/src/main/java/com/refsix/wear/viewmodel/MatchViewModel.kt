@@ -61,6 +61,9 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
     private val _pendingSetups = MutableStateFlow<List<MatchSetupData>>(emptyList())
     val pendingSetups: StateFlow<List<MatchSetupData>> = _pendingSetups.asStateFlow()
 
+    private val _isFetchingSetups = MutableStateFlow(false)
+    val isFetchingSetups: StateFlow<Boolean> = _isFetchingSetups.asStateFlow()
+
     // One-shot signal: SetupScreen watches this to apply local form fields after
     // returning from the list screen. Cleared by consumeAppliedSetup().
     private val _appliedSetup = MutableStateFlow<MatchSetupData?>(null)
@@ -206,12 +209,15 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
 
     fun refreshPendingSetup() {
         viewModelScope.launch {
+            _isFetchingSetups.value = true
             val hasNetwork = pocketBaseSync.isNetworkAvailable()
             Log.d("MatchViewModel", "refreshPendingSetup: hasNetwork=$hasNetwork")
-            if (!hasNetwork) return@launch
-            val setups = pocketBaseSync.fetchPendingMatchSetups()
-            Log.d("MatchViewModel", "refreshPendingSetup: ${setups.size} pending setups")
-            _pendingSetups.value = setups
+            if (hasNetwork) {
+                val setups = pocketBaseSync.fetchPendingMatchSetups()
+                Log.d("MatchViewModel", "refreshPendingSetup: ${setups.size} pending setups")
+                _pendingSetups.value = setups
+            }
+            _isFetchingSetups.value = false
         }
     }
 

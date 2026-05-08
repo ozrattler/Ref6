@@ -27,14 +27,10 @@ fun SetupScreen(
     onShowSetupList: () -> Unit = {}
 ) {
     val state by viewModel.state.collectAsState()
-    val pendingSetups by viewModel.pendingSetups.collectAsState()
     val appliedSetup by viewModel.appliedSetup.collectAsState()
 
     var homeTeam by remember { mutableStateOf(state.homeTeam) }
     var awayTeam by remember { mutableStateOf(state.awayTeam) }
-
-    // Refresh pending setups every time this screen is shown.
-    LaunchedEffect(Unit) { viewModel.refreshPendingSetup() }
 
     // Pre-fill team names when returning from the setup list.
     LaunchedEffect(appliedSetup) {
@@ -60,30 +56,19 @@ fun SetupScreen(
             )
         }
 
-        if (pendingSetups.isNotEmpty()) {
-            item {
-                val count = pendingSetups.size
-                Chip(
-                    label = {
-                        Text(
-                            text = if (count == 1) "LOAD SETUP" else "LOAD SETUP ($count)",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp
-                        )
-                    },
-                    secondaryLabel = {
-                        val s = pendingSetups.first()
-                        Text(
-                            text = "${s.homeTeam.ifBlank { "?" }} vs ${s.awayTeam.ifBlank { "?" }}" +
-                                if (count > 1) " …" else "",
-                            fontSize = 10.sp
-                        )
-                    },
-                    onClick = onShowSetupList,
-                    colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF1B4D1B)),
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
+        item {
+            Chip(
+                label = {
+                    Text(
+                        text = "LOAD SETUP",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp
+                    )
+                },
+                onClick = onShowSetupList,
+                colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF1B4D1B)),
+                modifier = Modifier.fillMaxWidth()
+            )
         }
 
         item {

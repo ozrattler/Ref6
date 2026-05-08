@@ -20,6 +20,10 @@ fun MatchSetupListScreen(
     onCancel: () -> Unit
 ) {
     val setups by viewModel.pendingSetups.collectAsState()
+    val isFetching by viewModel.isFetchingSetups.collectAsState()
+
+    // Fetch fresh from PocketBase every time this screen opens.
+    LaunchedEffect(Unit) { viewModel.refreshPendingSetup() }
 
     ScalingLazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -36,16 +40,24 @@ fun MatchSetupListScreen(
             )
         }
 
-        if (setups.isEmpty()) {
-            item {
+        when {
+            isFetching -> item {
                 Text(
-                    text = "No pending setups",
+                    text = "Checking…",
                     style = MaterialTheme.typography.body2,
                     color = Color.Gray
                 )
             }
-        } else {
-            items(setups.size) { i ->
+
+            setups.isEmpty() -> item {
+                Text(
+                    text = "No setups available",
+                    style = MaterialTheme.typography.body2,
+                    color = Color.Gray
+                )
+            }
+
+            else -> items(setups.size) { i ->
                 val setup = setups[i]
                 val detail = listOf(setup.competition, setup.ageGroup.label)
                     .filter { it.isNotBlank() }
