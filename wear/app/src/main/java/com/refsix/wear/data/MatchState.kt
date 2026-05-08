@@ -73,7 +73,8 @@ data class MatchState(
     val phase: MatchPhase = MatchPhase.SETUP,
     val events: List<MatchEvent> = emptyList(),
     val sinBins: List<SinBinEntry> = emptyList(),
-    val cardAlert: CardAlert? = null
+    val cardAlert: CardAlert? = null,
+    val matchSetupId: String? = null
 ) {
     val isSpl: Boolean get() = competitionType == CompetitionType.SPL
     val halfLengthSeconds: Long get() = halfLengthMinutes * 60L

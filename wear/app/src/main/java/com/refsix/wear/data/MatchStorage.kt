@@ -15,7 +15,8 @@ class MatchStorage(context: Context) {
             halfLengthMinutes = state.halfLengthMinutes,
             ageGroup = state.ageGroup.label,
             competition = state.competitionType.label,
-            events = state.events
+            events = state.events,
+            matchSetupId = state.matchSetupId
         )
         val existing = loadMatches().toMutableList()
         existing.add(0, match)

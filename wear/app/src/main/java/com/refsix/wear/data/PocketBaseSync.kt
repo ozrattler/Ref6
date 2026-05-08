@@ -106,27 +106,6 @@ class PocketBaseSync(private val context: Context) {
         }
     }
 
-    suspend fun markMatchSetupLoaded(id: String) = withContext(Dispatchers.IO) {
-        try {
-            val url = "$baseUrl/match_setups/records/$id"
-            Log.d(TAG, "markMatchSetupLoaded: PATCH $url")
-            val conn = URL(url).openConnection() as HttpURLConnection
-            conn.requestMethod = "PATCH"
-            conn.setRequestProperty("Content-Type", "application/json")
-            conn.doOutput = true
-            conn.connectTimeout = 5_000
-            conn.readTimeout = 5_000
-            OutputStreamWriter(conn.outputStream).use {
-                it.write(JSONObject().apply { put("status", "loaded") }.toString())
-            }
-            val code = conn.responseCode
-            Log.d(TAG, "markMatchSetupLoaded: HTTP $code")
-            conn.disconnect()
-        } catch (e: Exception) {
-            Log.e(TAG, "markMatchSetupLoaded: exception", e)
-        }
-    }
-
     // Returns the PocketBase record ID on success, null on failure.
     suspend fun syncMatch(match: SavedMatch): String? = withContext(Dispatchers.IO) {
         try {
@@ -158,11 +137,36 @@ class PocketBaseSync(private val context: Context) {
                 }
                 postJson("$baseUrl/incidents/records", incidentBody)
             }
+
+            // Only now that sync succeeded, mark the originating setup as completed.
+            match.matchSetupId?.let { setupId ->
+                patchSetupStatus(setupId, "completed")
+            }
+
             Log.d(TAG, "syncMatch: done id=$pbMatchId")
             pbMatchId
         } catch (e: Exception) {
             Log.e(TAG, "syncMatch: exception", e)
             null
+        }
+    }
+
+    private fun patchSetupStatus(id: String, status: String) {
+        try {
+            val conn = URL("$baseUrl/match_setups/records/$id").openConnection() as HttpURLConnection
+            conn.requestMethod = "PATCH"
+            conn.setRequestProperty("Content-Type", "application/json")
+            conn.doOutput = true
+            conn.connectTimeout = 5_000
+            conn.readTimeout = 5_000
+            OutputStreamWriter(conn.outputStream).use {
+                it.write(JSONObject().apply { put("status", status) }.toString())
+            }
+            val code = conn.responseCode
+            Log.d(TAG, "patchSetupStatus($id → $status): HTTP $code")
+            conn.disconnect()
+        } catch (e: Exception) {
+            Log.e(TAG, "patchSetupStatus: exception", e)
         }
     }
 

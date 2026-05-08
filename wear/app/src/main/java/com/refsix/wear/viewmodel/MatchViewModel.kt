@@ -222,19 +222,17 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun applyMatchSetup(setup: MatchSetupData) {
-        _pendingSetups.update { it.filterNot { s -> s.id == setup.id } }
         _appliedSetup.value = setup
-        // Write template fields directly into match state so they survive
-        // without needing local vars on the (now simplified) setup screen.
         _state.update {
             it.copy(
                 ageGroup = setup.ageGroup,
                 halfLengthMinutes = setup.halfLengthMinutes,
                 competitionType = setup.competitionType,
-                sinBinMinutes = setup.sinBinMinutes
+                sinBinMinutes = setup.sinBinMinutes,
+                matchSetupId = setup.id
             )
         }
-        viewModelScope.launch { pocketBaseSync.markMatchSetupLoaded(setup.id) }
+        // Setup remains "pending" in PocketBase until full-time sync marks it "completed"
     }
 
     fun consumeAppliedSetup() {

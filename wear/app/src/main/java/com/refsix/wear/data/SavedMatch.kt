@@ -14,7 +14,8 @@ data class SavedMatch(
     val ageGroup: String = "",
     val competition: String = "",
     val events: List<MatchEvent>,
-    val pocketBaseId: String? = null
+    val pocketBaseId: String? = null,
+    val matchSetupId: String? = null
 ) {
     fun toJson(): String = JSONObject().apply {
         put("id", id)
@@ -27,6 +28,7 @@ data class SavedMatch(
         put("ageGroup", ageGroup)
         put("competition", competition)
         pocketBaseId?.let { put("pocketBaseId", it) }
+        matchSetupId?.let { put("matchSetupId", it) }
         put("events", JSONArray().apply {
             events.forEach { e ->
                 put(JSONObject().apply {
@@ -71,7 +73,8 @@ data class SavedMatch(
                 ageGroup = o.optString("ageGroup", ""),
                 competition = o.optString("competition", ""),
                 events = events,
-                pocketBaseId = o.optString("pocketBaseId", "").takeIf { it.isNotEmpty() }
+                pocketBaseId = o.optString("pocketBaseId", "").takeIf { it.isNotEmpty() },
+                matchSetupId = o.optString("matchSetupId", "").takeIf { it.isNotEmpty() }
             )
         }
     }
