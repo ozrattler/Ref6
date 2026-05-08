@@ -243,7 +243,7 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
         _pendingSetups.value = emptyList()
     }
 
-    fun recordGoal(team: String, scorerNumber: String = "", scorerName: String = "") {
+    fun recordGoal(team: String, scorerNumber: String = "", scorerName: String = "", goalType: String = "") {
         _state.update { s ->
             val isHome = team == s.homeTeam
             val event = MatchEvent(
@@ -252,7 +252,8 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
                 matchMinute = s.currentMatchMinute,
                 half = s.currentHalf,
                 scorerNumber = scorerNumber,
-                scorerName = scorerName
+                scorerName = scorerName,
+                detail = goalType
             )
             s.copy(
                 homeScore = if (isHome) s.homeScore + 1 else s.homeScore,

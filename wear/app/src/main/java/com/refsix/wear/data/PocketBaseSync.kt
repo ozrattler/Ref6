@@ -87,8 +87,11 @@ class PocketBaseSync(private val context: Context) {
                 val item = items.getJSONObject(i)
                 val ageGroup = parseAgeGroup(item.optString("age_group", ""))
                 val competition = item.optString("competition", "")
-                val compType = if (competition.contains("SPL", ignoreCase = true))
-                    CompetitionType.SPL else CompetitionType.STANDARD
+                val compType = when {
+                    competition.contains("SPLR", ignoreCase = true) -> CompetitionType.SPLR
+                    competition.contains("SPL", ignoreCase = true) -> CompetitionType.SPL
+                    else -> CompetitionType.STANDARD
+                }
                 MatchSetupData(
                     id = item.getString("id"),
                     homeTeam = item.optString("home_team", ""),

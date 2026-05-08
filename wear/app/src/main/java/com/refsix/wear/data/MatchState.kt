@@ -16,7 +16,8 @@ enum class AgeGroup(val label: String, val sinBinMinutes: Int, val defaultHalfMi
 
 enum class CompetitionType(val label: String) {
     STANDARD("Standard"),
-    SPL("SPL")
+    SPL("SPL"),
+    SPLR("SPLR")
 }
 
 enum class CardAlertType {
@@ -76,7 +77,7 @@ data class MatchState(
     val cardAlert: CardAlert? = null,
     val matchSetupId: String? = null
 ) {
-    val isSpl: Boolean get() = competitionType == CompetitionType.SPL
+    val isSpl: Boolean get() = competitionType == CompetitionType.SPL || competitionType == CompetitionType.SPLR
     val halfLengthSeconds: Long get() = halfLengthMinutes * 60L
     val halfRemainingSeconds: Long get() = maxOf(0L, halfLengthSeconds - halfElapsedSeconds)
     val isInAdditionalTime: Boolean get() = halfElapsedSeconds > halfLengthSeconds

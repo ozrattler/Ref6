@@ -19,6 +19,8 @@ import androidx.wear.compose.material.*
 import com.refsix.wear.ui.theme.*
 import com.refsix.wear.viewmodel.MatchViewModel
 
+private val GOAL_TYPES = listOf("Ordinary", "Penalty", "DFK", "Own Goal")
+
 @Composable
 fun GoalScorerScreen(
     viewModel: MatchViewModel,
@@ -28,6 +30,7 @@ fun GoalScorerScreen(
     val state by viewModel.state.collectAsState()
     val team = if (teamKey == "home") state.homeTeam else state.awayTeam
 
+    var selectedGoalType by remember { mutableStateOf("Ordinary") }
     var playerNumber by remember { mutableIntStateOf(1) }
     var scorerName by remember { mutableStateOf("") }
 
@@ -53,6 +56,37 @@ fun GoalScorerScreen(
                 color = Color.White,
                 fontWeight = FontWeight.Bold
             )
+        }
+
+        // Goal type — 2×2 grid of compact chips
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                GOAL_TYPES.chunked(2).forEach { row ->
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        row.forEach { gt ->
+                            val isSelected = gt == selectedGoalType
+                            CompactChip(
+                                label = {
+                                    Text(
+                                        text = gt,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        fontSize = 11.sp,
+                                        maxLines = 1
+                                    )
+                                },
+                                onClick = { selectedGoalType = gt },
+                                colors = ChipDefaults.chipColors(
+                                    backgroundColor = if (isSelected) RefGreen else Color(0xFF2A2A2A)
+                                ),
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                }
+            }
         }
 
         item {
@@ -121,7 +155,7 @@ fun GoalScorerScreen(
             Chip(
                 label = { Text("CONFIRM GOAL", fontWeight = FontWeight.Bold) },
                 onClick = {
-                    viewModel.recordGoal(team, "$playerNumber", scorerName.trim())
+                    viewModel.recordGoal(team, "$playerNumber", scorerName.trim(), selectedGoalType)
                     onDone()
                 },
                 colors = ChipDefaults.chipColors(backgroundColor = RefGreen),
