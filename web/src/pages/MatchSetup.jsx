@@ -4,7 +4,7 @@ import FixtureFormFields from '../components/FixtureFormFields'
 import TemplateManager from '../components/TemplateManager'
 
 const DEFAULT_FORM = {
-  competition:       '',
+  competition:       'SSFA Winter 2026',
   venue:             '',
   kickoffDate:       '',
   kickoffTime:       '',
@@ -15,7 +15,7 @@ const DEFAULT_FORM = {
   ageGroup:          'Open / Senior',
   halfLength:        45,
   dissentSinBin:     true,
-  recordGoalScorers: true,
+  recordGoalScorers: false,
   extraTime:         false,
   penalties:         false,
   referee:           'Sir John',
@@ -144,7 +144,7 @@ export default function MatchSetup() {
       showToast('Match setup saved!')
       setForm(f => ({
         ...f,
-        competition: '', venue: '', kickoffDate: '', kickoffTime: '',
+        venue: '', kickoffDate: '', kickoffTime: '',
         homeTeam: '', awayTeam: '',
       }))
     } catch (err) {

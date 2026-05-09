@@ -1,4 +1,11 @@
+import { useState, useEffect, useRef } from 'react'
+
+// SPL/SPLR kept for backward compat with records created before rename
+export const SPL_AGE_GROUPS = new Set(['PLM', 'PLR', 'SPL', 'SPLR'])
+
 export const AGE_GROUPS = [
+  { label: 'PLM',           halfLength: 45 },
+  { label: 'PLR',           halfLength: 45 },
   { label: 'Open / Senior', halfLength: 45 },
   { label: 'U16',           halfLength: 35 },
   { label: 'U15',           halfLength: 35 },
@@ -13,7 +20,6 @@ export const KIT_COLOURS = [
   ['#ffffff', 'White'],  ['#9ca3af', 'Silver'],  ['#111827', 'Black'],
 ]
 
-// Coloured swatch that opens the native colour picker on click
 export function KitSwatchBtn({ value, onChange }) {
   return (
     <label className="kit-swatch-btn" title="Choose kit colour">
@@ -23,7 +29,6 @@ export function KitSwatchBtn({ value, onChange }) {
   )
 }
 
-// Row of preset kit colour dots
 export function ColourPresets({ value, onChange }) {
   return (
     <div className="colour-presets">
@@ -38,13 +43,93 @@ export function ColourPresets({ value, onChange }) {
   )
 }
 
-// All form fields shared between MatchSetup and FixtureDetail edit form.
-// `form` is the current values object; `set(field, value)` updates a single field.
+// Venue field with Nominatim (OpenStreetMap) place-name autocomplete
+function VenuePicker({ value, onChange }) {
+  const [query,       setQuery]       = useState(value || '')
+  const [suggestions, setSuggestions] = useState([])
+  const [open,        setOpen]        = useState(false)
+  const [searching,   setSearching]   = useState(false)
+  const debounce = useRef(null)
+
+  // Sync when parent updates the value (e.g. calendar import fills the field)
+  useEffect(() => { setQuery(value || '') }, [value])
+
+  function handleChange(e) {
+    const v = e.target.value
+    setQuery(v)
+    onChange(v)
+    clearTimeout(debounce.current)
+    if (v.length < 3) { setSuggestions([]); setOpen(false); return }
+    debounce.current = setTimeout(() => fetchSuggestions(v), 420)
+  }
+
+  async function fetchSuggestions(q) {
+    setSearching(true)
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?` +
+        `q=${encodeURIComponent(q)}&format=json&limit=6&addressdetails=1&countrycodes=au`
+      const res  = await fetch(url, { headers: { 'Accept-Language': 'en-AU' } })
+      const data = await res.json()
+      const results = data
+        .map(item => ({
+          name:    item.name || item.display_name.split(',')[0].trim(),
+          suburb:  [item.address?.suburb, item.address?.city_district,
+                    item.address?.city || item.address?.town || item.address?.village]
+                    .filter(Boolean)[0] || '',
+        }))
+        .filter(s => s.name)
+      setSuggestions(results)
+      setOpen(results.length > 0)
+    } catch {
+      setSuggestions([])
+    } finally {
+      setSearching(false)
+    }
+  }
+
+  function pick(name) {
+    setQuery(name)
+    onChange(name)
+    setSuggestions([])
+    setOpen(false)
+  }
+
+  return (
+    <div className="venue-picker">
+      <div className="venue-input-row">
+        <input className="form-input" value={query}
+          onChange={handleChange}
+          onBlur={() => setTimeout(() => setOpen(false), 160)}
+          onFocus={() => suggestions.length > 0 && setOpen(true)}
+          placeholder="Ground name or address"
+          autoComplete="off"
+        />
+        {searching && <span className="venue-searching">…</span>}
+      </div>
+      {open && suggestions.length > 0 && (
+        <div className="venue-suggestions">
+          {suggestions.map((s, i) => (
+            <button key={i} type="button" className="venue-suggestion-item"
+              onMouseDown={() => pick(s.name)}>
+              <span className="venue-suggestion-name">{s.name}</span>
+              {s.suburb && <span className="venue-suggestion-addr">{s.suburb}</span>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function FixtureFormFields({ form, set }) {
   function onAgeGroupChange(label) {
     const ag = AGE_GROUPS.find(a => a.label === label)
     set('ageGroup', label)
-    if (ag) set('halfLength', ag.halfLength)
+    if (ag) {
+      set('halfLength', ag.halfLength)
+      // PLM/PLR → goal scorers ON; all others → OFF
+      set('recordGoalScorers', SPL_AGE_GROUPS.has(label))
+    }
   }
 
   return (
@@ -56,14 +141,12 @@ export default function FixtureFormFields({ form, set }) {
         <label className="form-label">Competition <span className="form-optional">(optional)</span></label>
         <input className="form-input" value={form.competition}
           onChange={e => set('competition', e.target.value)}
-          placeholder="e.g. U15 Premier League" autoComplete="off" />
+          placeholder="e.g. SSFA Winter 2026" autoComplete="off" />
       </div>
 
       <div className="form-group">
         <label className="form-label">Venue <span className="form-optional">(optional)</span></label>
-        <input className="form-input" value={form.venue}
-          onChange={e => set('venue', e.target.value)}
-          placeholder="Ground name" autoComplete="off" />
+        <VenuePicker value={form.venue} onChange={v => set('venue', v)} />
       </div>
 
       <div className="teams-row">
@@ -164,7 +247,7 @@ export default function FixtureFormFields({ form, set }) {
 
       {[
         ['dissentSinBin',     'Dissent = Sin Bin'],
-        ['recordGoalScorers', 'Record Goal Scorers'],
+        ['recordGoalScorers', SPL_AGE_GROUPS.has(form.ageGroup) ? 'Record Goal Scorers (+ Goal Type)' : 'Record Goal Scorers'],
         ['extraTime',         'Extra Time'],
         ['penalties',         'Penalties'],
       ].map(([field, label]) => (

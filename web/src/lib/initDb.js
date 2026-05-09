@@ -49,6 +49,7 @@ const MATCH_SETUPS_SCHEMA = [
   f('venue',               'text'),
   f('kickoff_date',        'text'),
   f('kickoff_time',        'text'),
+  f('ical_uid',            'text'),
 ]
 
 const TEMPLATES_SCHEMA = [
@@ -78,6 +79,7 @@ function incidentsSchema(matchesId) {
     f('player_number',       'text'),
     f('player_name',         'text'),
     f('offence_description', 'text'),
+    f('goal_type',           'text'),
   ]
 }
 

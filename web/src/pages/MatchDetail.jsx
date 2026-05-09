@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { pb } from '../lib/pb'
 import { kitStyle } from '../lib/colours'
+import { SPL_AGE_GROUPS } from '../components/FixtureFormFields'
 
 const TYPE_META = {
   GOAL:        { label: '⚽ Goal',  cls: 'goal' },
@@ -87,6 +88,7 @@ export default function MatchDetail() {
   const first  = allHaveHalf ? incidents.filter(i => i.half === 1) : incidents.filter(i => i.minute <= halfLen)
   const second = allHaveHalf ? incidents.filter(i => i.half === 2) : incidents.filter(i => i.minute > halfLen)
   const hasOfficials = match.referee || match.ar1 || match.ar2 || match.fourth_official
+  const showGoalType = SPL_AGE_GROUPS.has(match.age_group)
 
   const dl = (() => {
     const parts = []
@@ -167,10 +169,10 @@ export default function MatchDetail() {
               <p className="no-incidents">No incidents recorded for this match.</p>
             ) : (
               <>
-                <HalfSection label="1st Half" incidents={first}
+                <HalfSection label="1st Half" incidents={first} showGoalType={showGoalType}
                   homeTeam={match.home_team} homeColour={match.home_colour}
                   awayTeam={match.away_team} awayColour={match.away_colour} />
-                <HalfSection label="2nd Half" incidents={second}
+                <HalfSection label="2nd Half" incidents={second} showGoalType={showGoalType}
                   homeTeam={match.home_team} homeColour={match.home_colour}
                   awayTeam={match.away_team} awayColour={match.away_colour} />
               </>
@@ -283,13 +285,13 @@ function OfficialItem({ role, name }) {
   )
 }
 
-function HalfSection({ label, incidents, homeTeam, homeColour, awayTeam, awayColour }) {
+function HalfSection({ label, incidents, showGoalType, homeTeam, homeColour, awayTeam, awayColour }) {
   if (!incidents.length) return null
   return (
     <div className="incident-half">
       <h3 className="incident-half-title">{label}</h3>
       {incidents.map(i => (
-        <IncidentRow key={i.id} incident={i}
+        <IncidentRow key={i.id} incident={i} showGoalType={showGoalType}
           homeTeam={homeTeam} homeColour={homeColour}
           awayTeam={awayTeam} awayColour={awayColour} />
       ))}
@@ -297,7 +299,7 @@ function HalfSection({ label, incidents, homeTeam, homeColour, awayTeam, awayCol
   )
 }
 
-function IncidentRow({ incident, homeTeam, homeColour, awayTeam, awayColour }) {
+function IncidentRow({ incident, showGoalType, homeTeam, homeColour, awayTeam, awayColour }) {
   const meta   = TYPE_META[incident.type] ?? { label: incident.type, cls: '' }
   const player = [
     incident.player_number && `#${incident.player_number}`,
@@ -315,6 +317,9 @@ function IncidentRow({ incident, homeTeam, homeColour, awayTeam, awayColour }) {
       <div className="incident-info">
         <span className="incident-team" style={kitStyle(teamColour)}>{incident.team}</span>
         {player && <span className="incident-player">{player}</span>}
+        {showGoalType && incident.type === 'GOAL' && incident.goal_type && (
+          <span className="incident-goal-type">{incident.goal_type}</span>
+        )}
         {incident.offence_description && (
           <span className="incident-offence">{incident.offence_description}</span>
         )}
