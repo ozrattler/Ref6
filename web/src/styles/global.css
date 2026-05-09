@@ -901,6 +901,140 @@ body {
   line-height: 1;
 }
 
+/* ── Fixtures page header + sync bar ── */
+.fixtures-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+.fixtures-header .page-title { margin-bottom: 0; }
+
+.sync-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.btn-sync {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: var(--radius-sm);
+  padding: 6px 12px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: var(--font);
+  white-space: nowrap;
+  transition: color .15s, background .15s, border-color .15s;
+}
+.btn-sync:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--surface-hover);
+  border-color: #4b5c75;
+}
+.btn-sync:disabled { opacity: .5; cursor: not-allowed; }
+
+.sync-status { font-size: 0.75rem; color: var(--muted); white-space: nowrap; }
+.sync-status-ok  { color: var(--accent); }
+.sync-status-err { color: #f87171; }
+
+/* ── Venue picker ── */
+.venue-picker { position: relative; }
+.venue-input-row { display: flex; align-items: center; gap: 8px; }
+.venue-input-row .form-input { flex: 1; }
+.venue-searching { color: var(--muted); font-size: 1rem; line-height: 1; }
+.venue-suggestions {
+  position: absolute; top: 100%; left: 0; right: 0; z-index: 100;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); box-shadow: 0 4px 16px rgba(0,0,0,.4);
+  margin-top: 2px; overflow: hidden;
+}
+.venue-suggestion-item {
+  display: flex; align-items: baseline; gap: 8px; width: 100%;
+  padding: 9px 12px; background: none; border: none; cursor: pointer;
+  color: var(--text); font-size: 0.9rem; text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+.venue-suggestion-item:last-child { border-bottom: none; }
+.venue-suggestion-item:hover { background: var(--surface-hover); }
+.venue-suggestion-name { font-weight: 500; }
+.venue-suggestion-addr { color: var(--muted); font-size: 0.8rem; }
+
+/* ── Goal type badge ── */
+.incident-goal-type {
+  display: inline-block; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.03em;
+  padding: 1px 7px; border-radius: 99px;
+  background: rgba(34,197,94,.18); color: #86efac;
+  vertical-align: middle; margin-left: 4px;
+}
+
+/* ── Recently Loaded section ── */
+.loaded-section {
+  margin-top: 32px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+.loaded-section-header {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+.loaded-fixture-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  margin-bottom: 8px;
+}
+.loaded-fixture-info { flex: 1; min-width: 0; }
+.loaded-fixture-teams {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+.loaded-fixture-team { font-size: 0.95rem; font-weight: 600; }
+.loaded-fixture-vs   { font-size: 0.75rem; color: var(--muted); font-weight: 600; }
+.loaded-fixture-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.loaded-fixture-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.btn-restore {
+  background: none;
+  border: 1px solid rgba(234,179,8,.45);
+  color: #fde68a;
+  border-radius: var(--radius-sm);
+  padding: 6px 14px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: var(--font);
+  white-space: nowrap;
+  transition: background .15s, border-color .15s;
+}
+.btn-restore:hover:not(:disabled) {
+  background: rgba(234,179,8,.12);
+  border-color: #fde68a;
+}
+.btn-restore:disabled { opacity: .5; cursor: not-allowed; }
+
 /* ── Responsive ── */
 @media (max-width: 480px) {
   .teams-row       { flex-direction: column; gap: 0; }
@@ -909,4 +1043,5 @@ body {
   .officials-grid  { grid-template-columns: 1fr; }
   .officials-list  { grid-template-columns: 1fr; }
   .setup-header    { flex-direction: column; align-items: flex-start; }
+  .sync-bar        { flex-wrap: wrap; }
 }
