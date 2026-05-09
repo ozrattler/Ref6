@@ -5,7 +5,7 @@ import android.content.Context
 class MatchStorage(context: Context) {
     private val prefs = context.getSharedPreferences("ref6_history", Context.MODE_PRIVATE)
 
-    fun saveMatch(state: MatchState) {
+    fun saveMatch(state: MatchState, status: String = "completed") {
         val match = SavedMatch(
             dateMillis = System.currentTimeMillis(),
             homeTeam = state.homeTeam,
@@ -15,6 +15,7 @@ class MatchStorage(context: Context) {
             halfLengthMinutes = state.halfLengthMinutes,
             ageGroup = state.ageGroup.label,
             competition = state.competitionType.label,
+            status = status,
             events = state.events,
             matchSetupId = state.matchSetupId
         )

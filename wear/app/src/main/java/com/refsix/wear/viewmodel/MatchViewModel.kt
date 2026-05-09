@@ -36,6 +36,7 @@ sealed class MatchUiEvent {
     object HalfTimeAlert : MatchUiEvent()
     object FullTimeAlert : MatchUiEvent()
     object HalfTimeCountdownExpired : MatchUiEvent()
+    object MatchAbandoned : MatchUiEvent()
 }
 
 class MatchViewModel(application: Application) : AndroidViewModel(application) {
@@ -355,6 +356,31 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
 
     fun returnFromSinBin(sinBinId: Long) {
         _state.update { s -> s.copy(sinBins = s.sinBins.filter { it.id != sinBinId }) }
+    }
+
+    // Save=Yes: save partial match as abandoned, sync to PocketBase (setup gets consumed by sync).
+    fun abandonMatch() {
+        halfTimeCountdownJob?.cancel()
+        _halfTimeCountdown.value = 0
+        _state.update { it.copy(isRunning = false) }
+        matchStorage.saveMatch(_state.value, status = "abandoned")
+        _savedMatches.value = matchStorage.loadMatches()
+        _state.value = MatchState()
+        viewModelScope.launch {
+            _uiEvents.emit(MatchUiEvent.MatchAbandoned)
+            syncUnsyncedMatches()
+        }
+    }
+
+    // Save=No, Keep=No: discard match data and mark setup consumed in PocketBase.
+    fun discardAndConsumeSetup() {
+        val setupId = _state.value.matchSetupId
+        halfTimeCountdownJob?.cancel()
+        _halfTimeCountdown.value = 0
+        _state.value = MatchState()
+        if (setupId != null) {
+            viewModelScope.launch { pocketBaseSync.consumeSetup(setupId) }
+        }
     }
 
     fun clearHistory() {

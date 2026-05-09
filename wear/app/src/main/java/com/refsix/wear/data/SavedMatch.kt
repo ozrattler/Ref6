@@ -13,6 +13,7 @@ data class SavedMatch(
     val halfLengthMinutes: Int,
     val ageGroup: String = "",
     val competition: String = "",
+    val status: String = "completed",
     val events: List<MatchEvent>,
     val pocketBaseId: String? = null,
     val matchSetupId: String? = null
@@ -27,6 +28,7 @@ data class SavedMatch(
         put("halfLengthMinutes", halfLengthMinutes)
         put("ageGroup", ageGroup)
         put("competition", competition)
+        put("status", status)
         pocketBaseId?.let { put("pocketBaseId", it) }
         matchSetupId?.let { put("matchSetupId", it) }
         put("events", JSONArray().apply {
@@ -72,6 +74,7 @@ data class SavedMatch(
                 halfLengthMinutes = o.getInt("halfLengthMinutes"),
                 ageGroup = o.optString("ageGroup", ""),
                 competition = o.optString("competition", ""),
+                status = o.optString("status", "completed"),
                 events = events,
                 pocketBaseId = o.optString("pocketBaseId", "").takeIf { it.isNotEmpty() },
                 matchSetupId = o.optString("matchSetupId", "").takeIf { it.isNotEmpty() }

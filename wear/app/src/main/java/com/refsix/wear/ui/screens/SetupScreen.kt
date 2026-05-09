@@ -32,6 +32,8 @@ fun SetupScreen(
     var homeTeam by remember { mutableStateOf(state.homeTeam) }
     var awayTeam by remember { mutableStateOf(state.awayTeam) }
 
+    val hasData = homeTeam.isNotBlank() || awayTeam.isNotBlank() || state.matchSetupId != null
+
     // Pre-fill team names when returning from the setup list.
     LaunchedEffect(appliedSetup) {
         appliedSetup?.let { setup ->
@@ -102,6 +104,20 @@ fun SetupScreen(
                 colors = ChipDefaults.chipColors(backgroundColor = RefGreen),
                 modifier = Modifier.fillMaxWidth()
             )
+        }
+
+        if (hasData) {
+            item {
+                CompactChip(
+                    label = { Text("Cancel", fontWeight = FontWeight.Bold) },
+                    onClick = {
+                        homeTeam = ""
+                        awayTeam = ""
+                        viewModel.resetMatch()
+                    },
+                    colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF4A1A1A))
+                )
+            }
         }
 
         item {

@@ -102,6 +102,7 @@ class MainActivity : ComponentActivity() {
                                     )
                                 )
                             }
+                            is MatchUiEvent.MatchAbandoned -> { /* navigation handled by callback */ }
                         }
                     }
                 }
@@ -139,7 +140,12 @@ class MainActivity : ComponentActivity() {
                     composable("match") {
                         MatchScreen(
                             navController = navController,
-                            viewModel = matchViewModel
+                            viewModel = matchViewModel,
+                            onAbandonMatch = {
+                                navController.navigate("setup") {
+                                    popUpTo(0) { inclusive = true }
+                                }
+                            }
                         )
                     }
 

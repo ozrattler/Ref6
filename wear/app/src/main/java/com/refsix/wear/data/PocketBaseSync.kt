@@ -85,11 +85,19 @@ class PocketBaseSync(private val context: Context) {
             Log.d(TAG, "fetchPendingMatchSetups: totalItems=${json.optInt("totalItems")} returned=${items.length()}")
             (0 until items.length()).map { i ->
                 val item = items.getJSONObject(i)
-                val ageGroup = parseAgeGroup(item.optString("age_group", ""))
+                val ageGroupStr = item.optString("age_group", "")
+                val ageGroup = parseAgeGroup(ageGroupStr)
                 val competition = item.optString("competition", "")
+                // age_group is the authoritative source for PLM/PLR; legacy SPL/SPLR also accepted
                 val compType = when {
-                    competition.contains("SPLR", ignoreCase = true) -> CompetitionType.SPLR
-                    competition.contains("SPL", ignoreCase = true) -> CompetitionType.SPL
+                    ageGroupStr.equals("PLR",  ignoreCase = true) -> CompetitionType.PLR
+                    ageGroupStr.equals("PLM",  ignoreCase = true) -> CompetitionType.PLM
+                    ageGroupStr.equals("SPLR", ignoreCase = true) -> CompetitionType.PLR
+                    ageGroupStr.equals("SPL",  ignoreCase = true) -> CompetitionType.PLM
+                    competition.contains("PLR",  ignoreCase = true) -> CompetitionType.PLR
+                    competition.contains("PLM",  ignoreCase = true) -> CompetitionType.PLM
+                    competition.contains("SPLR", ignoreCase = true) -> CompetitionType.PLR
+                    competition.contains("SPL",  ignoreCase = true) -> CompetitionType.PLM
                     else -> CompetitionType.STANDARD
                 }
                 MatchSetupData(
@@ -120,7 +128,7 @@ class PocketBaseSync(private val context: Context) {
                 put("final_score", "${match.homeScore}-${match.awayScore}")
                 put("age_group", match.ageGroup)
                 put("half_length", match.halfLengthMinutes)
-                put("status", "completed")
+                put("status", match.status)
             }
             Log.d(TAG, "syncMatch: posting match ${match.homeTeam} vs ${match.awayTeam}")
             val pbMatchId = postJson("$baseUrl/matches/records", matchBody)
@@ -136,14 +144,17 @@ class PocketBaseSync(private val context: Context) {
                     put("team", event.team)
                     put("player_number", if (event.type == EventType.GOAL) event.scorerNumber else event.playerNumber)
                     put("player_name", event.scorerName)
-                    put("offence_description", event.detail)
+                    put("offence_description", if (event.type == EventType.GOAL) "" else event.detail)
+                    if (event.type == EventType.GOAL && event.detail.isNotEmpty()) {
+                        put("goal_type", event.detail)
+                    }
                 }
                 postJson("$baseUrl/incidents/records", incidentBody)
             }
 
-            // Only now that sync succeeded, mark the originating setup as completed.
+            // Only now that sync succeeded, mark the originating setup as done.
             match.matchSetupId?.let { setupId ->
-                patchSetupStatus(setupId, "completed")
+                patchSetupStatus(setupId, match.status)
             }
 
             Log.d(TAG, "syncMatch: done id=$pbMatchId")
@@ -152,6 +163,10 @@ class PocketBaseSync(private val context: Context) {
             Log.e(TAG, "syncMatch: exception", e)
             null
         }
+    }
+
+    suspend fun consumeSetup(setupId: String) = withContext(Dispatchers.IO) {
+        patchSetupStatus(setupId, "abandoned")
     }
 
     private fun patchSetupStatus(id: String, status: String) {

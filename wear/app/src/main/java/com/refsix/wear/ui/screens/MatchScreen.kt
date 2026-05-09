@@ -28,7 +28,7 @@ import com.refsix.wear.viewmodel.MatchViewModel
 import kotlinx.coroutines.delay
 
 @Composable
-fun MatchScreen(navController: NavController, viewModel: MatchViewModel) {
+fun MatchScreen(navController: NavController, viewModel: MatchViewModel, onAbandonMatch: () -> Unit = {}) {
     val state by viewModel.state.collectAsState()
     val pagerState = rememberPagerState(initialPage = 1) { 3 }
     val centerCount by viewModel.returnToCenterCount.collectAsState()
@@ -60,7 +60,12 @@ fun MatchScreen(navController: NavController, viewModel: MatchViewModel) {
                     viewModel = viewModel,
                     navController = navController
                 )
-                1 -> MainMatchPage(state = state, viewModel = viewModel, navController = navController)
+                1 -> MainMatchPage(
+                    state = state,
+                    viewModel = viewModel,
+                    navController = navController,
+                    onAbandonMatch = onAbandonMatch
+                )
                 2 -> TeamActionPage(
                     team = state.awayTeam,
                     teamKey = "away",
@@ -133,8 +138,11 @@ fun MatchScreen(navController: NavController, viewModel: MatchViewModel) {
 private fun MainMatchPage(
     state: MatchState,
     viewModel: MatchViewModel,
-    navController: NavController
+    navController: NavController,
+    onAbandonMatch: () -> Unit = {}
 ) {
+    // 0=hidden  1="Save match data?"  2="Keep setup to reload?"
+    var abandonStep by remember { mutableStateOf(0) }
     val homeBins = state.activeSinBins
         .filter { it.team == state.homeTeam }
         .sortedBy { it.remainingSeconds(state.totalElapsedSeconds) }
@@ -294,6 +302,109 @@ private fun MainMatchPage(
                     },
                     colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF9C27B0))
                 )
+            }
+
+            CompactChip(
+                label = { Text("ABANDON", fontWeight = FontWeight.Bold, fontSize = 10.sp) },
+                onClick = { abandonStep = 1 },
+                colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF4A1010))
+            )
+        }
+
+        // Two-step abandon overlay
+        if (abandonStep > 0) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(0xEE000000)),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(7.dp),
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xFF1A0000))
+                        .padding(horizontal = 16.dp, vertical = 14.dp)
+                ) {
+                    when (abandonStep) {
+                        1 -> {
+                            Text(
+                                "ABANDON MATCH",
+                                fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                                color = RefRed, textAlign = TextAlign.Center
+                            )
+                            Text(
+                                "Save match data?",
+                                fontSize = 15.sp, fontWeight = FontWeight.Bold,
+                                color = Color.White, textAlign = TextAlign.Center
+                            )
+                            Spacer(Modifier.height(1.dp))
+                            Chip(
+                                label = { Text("YES — Save", fontWeight = FontWeight.Bold) },
+                                onClick = {
+                                    abandonStep = 0
+                                    viewModel.abandonMatch()
+                                    onAbandonMatch()
+                                },
+                                colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF1B5E20)),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Chip(
+                                label = { Text("NO — Discard", fontWeight = FontWeight.Bold) },
+                                onClick = {
+                                    if (state.matchSetupId != null) {
+                                        abandonStep = 2
+                                    } else {
+                                        abandonStep = 0
+                                        viewModel.resetMatch()
+                                        onAbandonMatch()
+                                    }
+                                },
+                                colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF4A1010)),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            CompactChip(
+                                label = { Text("Cancel", fontWeight = FontWeight.Bold) },
+                                onClick = { abandonStep = 0 },
+                                colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF2A2A2A))
+                            )
+                        }
+                        2 -> {
+                            Text(
+                                "KEEP SETUP?",
+                                fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                                color = RefYellow, textAlign = TextAlign.Center
+                            )
+                            Text(
+                                "Keep setup available\nto reload?",
+                                fontSize = 13.sp, color = Color.White,
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(Modifier.height(1.dp))
+                            Chip(
+                                label = { Text("YES — Keep", fontWeight = FontWeight.Bold) },
+                                onClick = {
+                                    abandonStep = 0
+                                    viewModel.resetMatch()
+                                    onAbandonMatch()
+                                },
+                                colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF1A3A1A)),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Chip(
+                                label = { Text("NO — Remove", fontWeight = FontWeight.Bold) },
+                                onClick = {
+                                    abandonStep = 0
+                                    viewModel.discardAndConsumeSetup()
+                                    onAbandonMatch()
+                                },
+                                colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF4A1010)),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+                }
             }
         }
     }
