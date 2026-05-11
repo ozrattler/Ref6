@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { pb } from '../lib/pb'
 import { kitStyle } from '../lib/colours'
@@ -56,6 +56,8 @@ export default function Fixtures() {
   const [syncMsg,       setSyncMsg]       = useState(null)   // {text, ok}
   const [lastSync,      setLastSync]      = useState(() => getLastSync())
   const [restoring,     setRestoring]     = useState(null)   // id being restored
+  const [importModal,   setImportModal]   = useState(null)   // null | parsed state
+  const fileInputRef = useRef(null)
   const navigate = useNavigate()
 
   const loadFixtures = useCallback(() => {
@@ -90,6 +92,37 @@ export default function Fixtures() {
   }
 
   useEffect(() => { loadFixtures() }, [loadFixtures])
+
+  async function handleFileSelected(e) {
+    const file = e.target.files[0]
+    e.target.value = ''          // reset so same file can be re-selected
+    if (!file) return
+
+    setImportModal({ step: 'parsing' })
+    try {
+      const buffer = await file.arrayBuffer()
+      const { parseExcelFixtures } = await import('../lib/excelImport.js')
+      const { fixtures: rows, skipped } = parseExcelFixtures(buffer)
+      setImportModal({ step: 'preview', rows, skipped })
+    } catch (err) {
+      setImportModal({ step: 'error', message: err.message })
+    }
+  }
+
+  async function handleImportConfirm(rows) {
+    setImportModal(prev => ({ ...prev, step: 'importing' }))
+    let imported = 0, errors = 0
+    for (const row of rows) {
+      try {
+        await pb.collection('match_setups').create(row, { requestKey: null })
+        imported++
+      } catch {
+        errors++
+      }
+    }
+    setImportModal({ step: 'done', imported, errors })
+    if (imported > 0) loadFixtures()
+  }
 
   async function handleSync() {
     setSyncing(true)
@@ -136,6 +169,20 @@ export default function Fixtures() {
           {!syncMsg && lastSync && (
             <span className="sync-status">Synced {formatSyncTime(lastSync)}</span>
           )}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx"
+            style={{ display: 'none' }}
+            onChange={handleFileSelected}
+          />
+          <button
+            className="btn-sync"
+            onClick={() => fileInputRef.current?.click()}
+            title="Import fixtures from an Excel spreadsheet"
+          >
+            Import Excel
+          </button>
           <button
             className="btn-sync"
             onClick={handleSync}
@@ -146,6 +193,14 @@ export default function Fixtures() {
           </button>
         </div>
       </div>
+
+      {importModal && (
+        <ExcelImportModal
+          state={importModal}
+          onConfirm={handleImportConfirm}
+          onClose={() => setImportModal(null)}
+        />
+      )}
 
       {fixtures.length === 0 ? (
         <p className="empty-state">No upcoming fixtures. Add one via Match Setup or sync your calendar.</p>
@@ -176,6 +231,88 @@ export default function Fixtures() {
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+function ExcelImportModal({ state, onConfirm, onClose }) {
+  const { step } = state
+
+  return (
+    <div className="modal-backdrop" onClick={e => { if (e.target === e.currentTarget && step !== 'importing') onClose() }}>
+      <div className="modal">
+        <div className="modal-title">Import from Excel</div>
+
+        {step === 'parsing' && (
+          <p style={{ color: 'var(--muted)', fontSize: '0.9rem' }}>Reading file…</p>
+        )}
+
+        {step === 'preview' && (
+          <>
+            <div className="import-summary">
+              <span className="import-count-ok">{state.rows.length} fixture{state.rows.length !== 1 ? 's' : ''} ready to import</span>
+              {state.skipped > 0 && (
+                <span className="import-count-skip">{state.skipped} skipped (PLAYED / empty)</span>
+              )}
+            </div>
+            {state.rows.length > 0 && (
+              <div className="import-preview">
+                {state.rows.slice(0, 5).map((r, i) => (
+                  <div key={i} className="import-preview-row">
+                    <span className="import-preview-date">{r.kickoff_date || '—'}</span>
+                    <span className="import-preview-teams">
+                      {r.home_team || '?'} <span style={{ color: 'var(--muted)' }}>vs</span> {r.away_team || '?'}
+                    </span>
+                    {r.age_group && <span className="badge">{r.age_group}</span>}
+                  </div>
+                ))}
+                {state.rows.length > 5 && (
+                  <p style={{ color: 'var(--muted)', fontSize: '0.8rem', marginTop: 6 }}>
+                    …and {state.rows.length - 5} more
+                  </p>
+                )}
+              </div>
+            )}
+            <div className="modal-actions">
+              <button className="btn-ghost" onClick={onClose}>Cancel</button>
+              {state.rows.length > 0 && (
+                <button className="btn-primary-sm" onClick={() => onConfirm(state.rows)}>
+                  Import {state.rows.length} Fixture{state.rows.length !== 1 ? 's' : ''}
+                </button>
+              )}
+            </div>
+          </>
+        )}
+
+        {step === 'importing' && (
+          <p style={{ color: 'var(--muted)', fontSize: '0.9rem' }}>Importing…</p>
+        )}
+
+        {step === 'done' && (
+          <>
+            <div className="import-summary">
+              <span className="import-count-ok">{state.imported} imported</span>
+              {state.errors > 0 && (
+                <span className="import-count-skip">{state.errors} failed</span>
+              )}
+            </div>
+            <div className="modal-actions">
+              <button className="btn-primary-sm" onClick={onClose}>Done</button>
+            </div>
+          </>
+        )}
+
+        {step === 'error' && (
+          <>
+            <p style={{ color: '#f87171', fontSize: '0.9rem' }}>
+              Could not read file: {state.message}
+            </p>
+            <div className="modal-actions">
+              <button className="btn-ghost" onClick={onClose}>Close</button>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   )
 }
