@@ -1,7 +1,11 @@
 package com.refsix.wear.viewmodel
 
+import android.Manifest
 import android.app.Application
+import android.content.pm.PackageManager
+import android.location.Location
 import android.util.Log
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.refsix.wear.data.AgeGroup
@@ -10,6 +14,8 @@ import com.refsix.wear.data.CardAlertType
 import com.refsix.wear.data.CardType
 import com.refsix.wear.data.CompetitionType
 import com.refsix.wear.data.EventType
+import com.refsix.wear.data.GpsPoint
+import com.refsix.wear.data.GpsTracker
 import com.refsix.wear.data.MatchEvent
 import com.refsix.wear.data.MatchPhase
 import com.refsix.wear.data.MatchState
@@ -27,6 +33,8 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -43,6 +51,8 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
 
     private val matchStorage = MatchStorage(application)
     private val pocketBaseSync = PocketBaseSync(application)
+    private val gpsTracker = GpsTracker(application)
+    private var gpsActive = false
 
     private val _state = MutableStateFlow(MatchState())
     val state: StateFlow<MatchState> = _state.asStateFlow()
@@ -79,6 +89,7 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
         launchTimer()
         viewModelScope.launch { syncUnsyncedMatches() }
         refreshPendingSetup()
+        observeRunningForGps()
     }
 
     private fun launchTimer() {
@@ -115,6 +126,74 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // ── GPS tracking ─────────────────────────────────────────────────────────
+
+    private fun observeRunningForGps() {
+        viewModelScope.launch {
+            _state.map { it.isRunning }.distinctUntilChanged().collect { running ->
+                if (running) startGpsTracking() else stopGpsTracking()
+            }
+        }
+    }
+
+    private fun startGpsTracking() {
+        if (gpsActive) return
+        val app = getApplication<Application>()
+        if (ContextCompat.checkSelfPermission(app, Manifest.permission.ACCESS_FINE_LOCATION)
+            != PackageManager.PERMISSION_GRANTED) return
+        gpsActive = true
+        gpsTracker.startTracking(
+            onLocation = { location -> processGpsLocation(location) },
+            onFixChanged = { hasFix -> _state.update { it.copy(hasGpsFix = hasFix) } }
+        )
+    }
+
+    private fun stopGpsTracking() {
+        if (!gpsActive) return
+        gpsActive = false
+        gpsTracker.stopTracking()
+        _state.update { it.copy(hasGpsFix = false) }
+    }
+
+    private fun processGpsLocation(location: Location) {
+        if (location.hasAccuracy() && location.accuracy > 50f) return
+        val speedMs = if (location.hasSpeed()) location.speed else 0f
+
+        _state.update { s ->
+            if (!s.isRunning) return@update s
+
+            val newPoint = GpsPoint(
+                timestamp = System.currentTimeMillis(),
+                matchMinute = s.currentMatchMinute,
+                half = s.currentHalf,
+                lat = location.latitude,
+                lng = location.longitude,
+                accuracyMeters = if (location.hasAccuracy()) location.accuracy else 0f,
+                speedMs = speedMs
+            )
+
+            val distanceAdded = if (s.gpsPoints.isNotEmpty()) {
+                val prev = s.gpsPoints.last()
+                val timeDeltaSec = (newPoint.timestamp - prev.timestamp) / 1000L
+                if (timeDeltaSec <= 15L) {
+                    val results = FloatArray(1)
+                    Location.distanceBetween(prev.lat, prev.lng, newPoint.lat, newPoint.lng, results)
+                    results[0]
+                } else 0f
+            } else 0f
+
+            // cap max speed at 10 m/s (~36 km/h) to ignore GPS glitches
+            val newMax = if (speedMs < 10f) maxOf(s.maxSpeedMs, speedMs) else s.maxSpeedMs
+
+            s.copy(
+                gpsPoints = s.gpsPoints + newPoint,
+                totalDistanceMeters = s.totalDistanceMeters + distanceAdded,
+                maxSpeedMs = newMax,
+                hasGpsFix = true
+            )
+        }
+    }
+
     fun signalReturnToCenter() { _returnToCenterCount.update { it + 1 } }
 
     fun updateSetup(homeTeam: String, awayTeam: String) {
@@ -138,7 +217,11 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
                 awayScore = 0,
                 events = emptyList(),
                 sinBins = emptyList(),
-                cardAlert = null
+                cardAlert = null,
+                gpsPoints = emptyList(),
+                totalDistanceMeters = 0f,
+                maxSpeedMs = 0f,
+                hasGpsFix = false
             )
         }
     }
@@ -198,7 +281,7 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private suspend fun syncUnsyncedMatches() {
-        if (!pocketBaseSync.isWifiConnected()) return
+        if (!pocketBaseSync.isNetworkAvailable()) return
         matchStorage.getUnsyncedMatches().forEach { match ->
             val pbId = pocketBaseSync.syncMatch(match)
             if (pbId != null) {
