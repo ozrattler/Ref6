@@ -1,0 +1,10 @@
+# Android Studio installer
+android-studio.tar.gz
+
+# Android build artifacts
+wear/.gradle/
+wear/app/build/
+wear/local.properties
+
+# Web dependencies
+web/node_modules/
