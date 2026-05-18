@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -28,7 +29,7 @@ import com.refsix.wear.viewmodel.MatchViewModel
 import kotlinx.coroutines.delay
 
 @Composable
-fun MatchScreen(navController: NavController, viewModel: MatchViewModel, onAbandonMatch: () -> Unit = {}) {
+fun MatchScreen(navController: NavController, viewModel: MatchViewModel) {
     val state by viewModel.state.collectAsState()
     val pagerState = rememberPagerState(initialPage = 1) { 3 }
     val centerCount by viewModel.returnToCenterCount.collectAsState()
@@ -63,8 +64,7 @@ fun MatchScreen(navController: NavController, viewModel: MatchViewModel, onAband
                 1 -> MainMatchPage(
                     state = state,
                     viewModel = viewModel,
-                    navController = navController,
-                    onAbandonMatch = onAbandonMatch
+                    navController = navController
                 )
                 2 -> TeamActionPage(
                     team = state.awayTeam,
@@ -111,7 +111,7 @@ fun MatchScreen(navController: NavController, viewModel: MatchViewModel, onAband
                         }
                     }
                     Text(
-                        text = "#${alert.playerNumber}  ${alert.team}",
+                        text = "${if (alert.playerNumber == "Coach") "Coach" else "#${alert.playerNumber}"}  ${alert.team}",
                         style = MaterialTheme.typography.caption1,
                         color = Color.White,
                         textAlign = TextAlign.Center
@@ -138,11 +138,8 @@ fun MatchScreen(navController: NavController, viewModel: MatchViewModel, onAband
 private fun MainMatchPage(
     state: MatchState,
     viewModel: MatchViewModel,
-    navController: NavController,
-    onAbandonMatch: () -> Unit = {}
+    navController: NavController
 ) {
-    // 0=hidden  1="Save match data?"  2="Keep setup to reload?"
-    var abandonStep by remember { mutableStateOf(0) }
     val homeBins = state.activeSinBins
         .filter { it.team == state.homeTeam }
         .sortedBy { it.remainingSeconds(state.totalElapsedSeconds) }
@@ -172,10 +169,7 @@ private fun MainMatchPage(
             )
 
             Text(
-                text = "%02d:%02d".format(
-                    state.halfRemainingSeconds / 60,
-                    state.halfRemainingSeconds % 60
-                ),
+                text = "%02d:%02d".format(state.displayMinutes, state.displaySeconds),
                 fontSize = 30.sp,
                 fontWeight = FontWeight.Bold,
                 color = if (state.isRunning) Color.White else Color.Gray
@@ -194,21 +188,17 @@ private fun MainMatchPage(
             }
 
             Text(
-                text = "%02d:%02d".format(state.displayMinutes, state.displaySeconds),
-                fontSize = 12.sp,
-                color = Color.Gray
-            )
-
-            Text(
                 text = "${state.homeScore}  –  ${state.awayScore}",
                 fontSize = 26.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.White
             )
 
+            // Team names + GPS dot + distance on one row to keep layout compact
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = state.homeTeam.take(6),
@@ -217,6 +207,31 @@ private fun MainMatchPage(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(if (state.hasGpsFix) Color(0xFF22C55E) else Color(0xFF444444))
+                    )
+                    Spacer(modifier = Modifier.width(3.dp))
+                    Text(
+                        text = "%.2fkm".format(state.totalDistanceKm),
+                        fontSize = 9.sp,
+                        color = Color.Gray
+                    )
+                    if (state.currentHeartRate > 0) {
+                        Spacer(modifier = Modifier.width(5.dp))
+                        Text(
+                            text = "♥${state.currentHeartRate}",
+                            fontSize = 9.sp,
+                            color = Color(0xFFE53935)
+                        )
+                    }
+                }
                 Text(
                     text = state.awayTeam.take(6),
                     style = MaterialTheme.typography.caption2,
@@ -242,7 +257,7 @@ private fun MainMatchPage(
                         homeBins.take(3).forEach { bin ->
                             val remaining = bin.remainingSeconds(state.totalElapsedSeconds)
                             Text(
-                                text = "#${bin.playerNumber} %02d:%02d".format(
+                                text = "${if (bin.playerNumber == "Coach") "Coach" else "#${bin.playerNumber}"} %02d:%02d".format(
                                     remaining / 60, remaining % 60
                                 ),
                                 fontSize = 11.sp,
@@ -258,7 +273,7 @@ private fun MainMatchPage(
                         awayBins.take(3).forEach { bin ->
                             val remaining = bin.remainingSeconds(state.totalElapsedSeconds)
                             Text(
-                                text = "#${bin.playerNumber} %02d:%02d".format(
+                                text = "${if (bin.playerNumber == "Coach") "Coach" else "#${bin.playerNumber}"} %02d:%02d".format(
                                     remaining / 60, remaining % 60
                                 ),
                                 fontSize = 11.sp,
@@ -304,108 +319,6 @@ private fun MainMatchPage(
                 )
             }
 
-            CompactChip(
-                label = { Text("ABANDON", fontWeight = FontWeight.Bold, fontSize = 10.sp) },
-                onClick = { abandonStep = 1 },
-                colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF4A1010))
-            )
-        }
-
-        // Two-step abandon overlay
-        if (abandonStep > 0) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color(0xEE000000)),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(7.dp),
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xFF1A0000))
-                        .padding(horizontal = 16.dp, vertical = 14.dp)
-                ) {
-                    when (abandonStep) {
-                        1 -> {
-                            Text(
-                                "ABANDON MATCH",
-                                fontSize = 12.sp, fontWeight = FontWeight.Bold,
-                                color = RefRed, textAlign = TextAlign.Center
-                            )
-                            Text(
-                                "Save match data?",
-                                fontSize = 15.sp, fontWeight = FontWeight.Bold,
-                                color = Color.White, textAlign = TextAlign.Center
-                            )
-                            Spacer(Modifier.height(1.dp))
-                            Chip(
-                                label = { Text("YES — Save", fontWeight = FontWeight.Bold) },
-                                onClick = {
-                                    abandonStep = 0
-                                    viewModel.abandonMatch()
-                                    onAbandonMatch()
-                                },
-                                colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF1B5E20)),
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            Chip(
-                                label = { Text("NO — Discard", fontWeight = FontWeight.Bold) },
-                                onClick = {
-                                    if (state.matchSetupId != null) {
-                                        abandonStep = 2
-                                    } else {
-                                        abandonStep = 0
-                                        viewModel.resetMatch()
-                                        onAbandonMatch()
-                                    }
-                                },
-                                colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF4A1010)),
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            CompactChip(
-                                label = { Text("Cancel", fontWeight = FontWeight.Bold) },
-                                onClick = { abandonStep = 0 },
-                                colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF2A2A2A))
-                            )
-                        }
-                        2 -> {
-                            Text(
-                                "KEEP SETUP?",
-                                fontSize = 12.sp, fontWeight = FontWeight.Bold,
-                                color = RefYellow, textAlign = TextAlign.Center
-                            )
-                            Text(
-                                "Keep setup available\nto reload?",
-                                fontSize = 13.sp, color = Color.White,
-                                textAlign = TextAlign.Center
-                            )
-                            Spacer(Modifier.height(1.dp))
-                            Chip(
-                                label = { Text("YES — Keep", fontWeight = FontWeight.Bold) },
-                                onClick = {
-                                    abandonStep = 0
-                                    viewModel.resetMatch()
-                                    onAbandonMatch()
-                                },
-                                colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF1A3A1A)),
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            Chip(
-                                label = { Text("NO — Remove", fontWeight = FontWeight.Bold) },
-                                onClick = {
-                                    abandonStep = 0
-                                    viewModel.discardAndConsumeSetup()
-                                    onAbandonMatch()
-                                },
-                                colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF4A1010)),
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
-                    }
-                }
-            }
         }
     }
 }

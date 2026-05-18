@@ -81,6 +81,14 @@ routerAdd("GET", "/api/cal/sync", function(e) {
     return ""
   }
 
+  // Detect State Cup: matches "STATE CUP" or word-boundary "SRC".
+  function detectStateCup(summary, desc, competition) {
+    var text = (summary + " " + desc + " " + competition).toUpperCase()
+    if (text.indexOf("STATE CUP") !== -1) return true
+    if (/(?:^|\W)SRC(?:\W|$)/.test(text)) return true
+    return false
+  }
+
   function parseVevent(block) {
     var uid     = prop(block, "UID")
     var summary = prop(block, "SUMMARY").replace(/\\,/g,",").replace(/\\n/g," ").replace(/\\;/g,";")
@@ -90,9 +98,10 @@ routerAdd("GET", "/api/cal/sync", function(e) {
     var teams   = parseTeams(summary)
     var comp    = teams.competition || extractField(desc,"competition") || extractField(desc,"league") || ""
     var ageGroup = detectAgeGroup(summary, desc)
+    var stateCup = detectStateCup(summary, desc, comp)
     return { uid:uid, homeTeam:teams.homeTeam, awayTeam:teams.awayTeam,
              competition:comp, venue:extractVenue(loc,desc), date:dt.date, time:dt.time,
-             ageGroup:ageGroup }
+             ageGroup:ageGroup, stateCup:stateCup }
   }
 
   function parseIcal(text) {
@@ -200,6 +209,13 @@ routerAdd("GET", "/api/cal/sync", function(e) {
       if (!ev.ageGroup) {
         try { record.set("record_goal_scorers", false) } catch(_) {}
       }
+    }
+
+    // State Cup overrides: sin bin OFF, penalties ON, goal scorers ON
+    if (ev.stateCup) {
+      try { record.set("dissent_sin_bin",     false) } catch(_) {}
+      try { record.set("penalties",           true)  } catch(_) {}
+      try { record.set("record_goal_scorers", true)  } catch(_) {}
     }
 
     try {

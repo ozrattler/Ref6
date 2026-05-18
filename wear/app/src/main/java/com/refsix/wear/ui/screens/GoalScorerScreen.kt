@@ -1,17 +1,11 @@
 package com.refsix.wear.ui.screens
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
@@ -32,7 +26,6 @@ fun GoalScorerScreen(
 
     var selectedGoalType by remember { mutableStateOf("Ordinary") }
     var playerNumber by remember { mutableIntStateOf(1) }
-    var scorerName by remember { mutableStateOf("") }
 
     ScalingLazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -99,53 +92,10 @@ fun GoalScorerScreen(
         }
 
         item {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                CompactChip(
-                    label = { Text("−") },
-                    onClick = { if (playerNumber > 1) playerNumber-- }
-                )
-                Text(
-                    text = "$playerNumber",
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    modifier = Modifier.width(40.dp),
-                    textAlign = TextAlign.Center
-                )
-                CompactChip(
-                    label = { Text("+") },
-                    onClick = { if (playerNumber < 99) playerNumber++ }
-                )
-            }
-        }
-
-        item {
-            Text(
-                text = "Name (optional)",
-                style = MaterialTheme.typography.caption2,
-                color = Color.Gray,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-
-        item {
-            BasicTextField(
-                value = scorerName,
-                onValueChange = { if (it.length <= 20) scorerName = it },
-                textStyle = TextStyle(
-                    color = Color.White,
-                    fontSize = 14.sp,
-                    textAlign = TextAlign.Center
-                ),
-                cursorBrush = SolidColor(RefGreen),
-                singleLine = true,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color(0xFF2A2A2A), shape = RoundedCornerShape(8.dp))
-                    .padding(horizontal = 12.dp, vertical = 8.dp)
+            PlayerNumberPicker(
+                value = playerNumber,
+                onValueChange = { playerNumber = it },
+                fontSize = 24.sp
             )
         }
 
@@ -155,7 +105,7 @@ fun GoalScorerScreen(
             Chip(
                 label = { Text("CONFIRM GOAL", fontWeight = FontWeight.Bold) },
                 onClick = {
-                    viewModel.recordGoal(team, "$playerNumber", scorerName.trim(), selectedGoalType)
+                    viewModel.recordGoal(team, "$playerNumber", goalType = selectedGoalType)
                     onDone()
                 },
                 colors = ChipDefaults.chipColors(backgroundColor = RefGreen),

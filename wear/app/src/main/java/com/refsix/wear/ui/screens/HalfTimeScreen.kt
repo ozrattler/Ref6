@@ -16,7 +16,7 @@ import com.refsix.wear.ui.theme.*
 import com.refsix.wear.viewmodel.MatchViewModel
 
 @Composable
-fun HalfTimeScreen(viewModel: MatchViewModel, onStartSecondHalf: () -> Unit) {
+fun HalfTimeScreen(viewModel: MatchViewModel, onStopHalfTimeBreak: () -> Unit) {
     val state by viewModel.state.collectAsState()
     val countdown by viewModel.halfTimeCountdown.collectAsState()
 
@@ -102,11 +102,8 @@ fun HalfTimeScreen(viewModel: MatchViewModel, onStartSecondHalf: () -> Unit) {
 
         item {
             Chip(
-                label = { Text("START 2ND HALF", fontWeight = FontWeight.Bold) },
-                onClick = {
-                    viewModel.startSecondHalf()
-                    onStartSecondHalf()
-                },
+                label = { Text("STOP HT BREAK", fontWeight = FontWeight.Bold) },
+                onClick = { onStopHalfTimeBreak() },
                 colors = ChipDefaults.chipColors(backgroundColor = RefGreen),
                 modifier = Modifier.fillMaxWidth()
             )
@@ -133,7 +130,8 @@ internal fun EventItem(
             val scorer = if (event.scorerNumber.isNotEmpty()) " #${event.scorerNumber}" else ""
             "${event.matchMinute}'  G$scorer  ${event.team}"
         } else {
-            "${event.matchMinute}'  $abbrev  #${event.playerNumber}  ${event.team.take(5)}"
+            val who = if (event.playerNumber == "Coach") "Coach" else "#${event.playerNumber}"
+            "${event.matchMinute}'  $abbrev  $who  ${event.team.take(5)}"
         }
         Text(
             text = mainLine,

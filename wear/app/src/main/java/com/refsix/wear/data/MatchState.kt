@@ -41,7 +41,9 @@ data class MatchEvent(
     val matchMinute: Int,
     val half: Int,
     val scorerNumber: String = "",
-    val scorerName: String = ""
+    val scorerName: String = "",
+    val lat: Double? = null,
+    val lng: Double? = null
 )
 
 data class SinBinEntry(
@@ -61,6 +63,7 @@ data class SinBinEntry(
 data class MatchState(
     val homeTeam: String = "Home",
     val awayTeam: String = "Away",
+    val kickOffTeam: String = "",
     val halfLengthMinutes: Int = 45,
     val ageGroup: AgeGroup = AgeGroup.OPEN_SENIOR,
     val competitionType: CompetitionType = CompetitionType.STANDARD,
@@ -75,9 +78,35 @@ data class MatchState(
     val events: List<MatchEvent> = emptyList(),
     val sinBins: List<SinBinEntry> = emptyList(),
     val cardAlert: CardAlert? = null,
-    val matchSetupId: String? = null
+    val matchSetupId: String? = null,
+    val kickoffDate: String = "",
+    val kickoffTime: String = "",
+    // GPS tracking
+    val gpsPoints: List<GpsPoint> = emptyList(),
+    val totalDistanceMeters: Float = 0f,
+    val maxSpeedMs: Float = 0f,
+    val hasGpsFix: Boolean = false,
+    val validSpeedCount: Int = 0,
+    val totalValidSpeedSum: Float = 0f,
+    // Heart rate tracking
+    val currentHeartRate: Int = 0,
+    val avgHeartRate: Int = 0,
+    val maxHeartRate: Int = 0,
+    val heartRateReadings: List<Int> = emptyList(),
 ) {
     val isSpl: Boolean get() = competitionType == CompetitionType.PLM || competitionType == CompetitionType.PLR
+
+    val kickOffTeam2ndHalf: String get() = when (kickOffTeam) {
+        homeTeam -> awayTeam
+        awayTeam -> homeTeam
+        else -> ""
+    }
+
+    val totalDistanceKm: Float get() = totalDistanceMeters / 1000f
+    val avgSpeedMs: Float get() =
+        if (validSpeedCount > 0) totalValidSpeedSum / validSpeedCount else 0f
+    val avgSpeedKmh: Float get() = avgSpeedMs * 3.6f
+    val maxSpeedKmh: Float get() = maxSpeedMs * 3.6f
     val halfLengthSeconds: Long get() = halfLengthMinutes * 60L
     val halfRemainingSeconds: Long get() = maxOf(0L, halfLengthSeconds - halfElapsedSeconds)
     val isInAdditionalTime: Boolean get() = halfElapsedSeconds > halfLengthSeconds

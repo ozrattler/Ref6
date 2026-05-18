@@ -1,6 +1,53 @@
 import * as XLSX from 'xlsx'
 
 const PLM_PLR = new Set(['PLM', 'PLR', 'SPL', 'SPLR'])
+const STATE_CUP_RE = /state\s*cup|(?<!\w)src(?!\w)/i
+
+// Map a League column value to a normalised age_group string.
+// Returns null for SRC (caller handles competition field instead).
+function mapLeagueToAgeGroup(league) {
+  const u = league.toUpperCase().trim()
+  if (!u) return ''
+  if (u === 'PLM' || u === 'SPL')  return 'PLM'
+  if (u === 'PLR' || u === 'SPLR') return 'PLR'
+  if (u === 'SRC') return null   // not an age group — caller flags as State Cup
+  if (u.startsWith('AW'))        return 'Open / Senior'
+
+  // U<n> or W<n> — U18D, W18B, etc.
+  const um = u.match(/^[UW](\d+)/)
+  if (um) {
+    const age = parseInt(um[1], 10)
+    if (age >= 21) return 'Open / Senior'
+    if (age >= 18) return 'U18'
+    if (age >= 16) return 'U16'
+    if (age >= 15) return 'U15'
+    if (age >= 14) return 'U14'
+    return 'U12'
+  }
+
+  // Anything else containing a number >= 21 (e.g. "21A")
+  const nm = u.match(/(\d+)/)
+  if (nm && parseInt(nm[1], 10) >= 21) return 'Open / Senior'
+
+  return league  // unrecognised — keep as-is
+}
+
+// Try to infer an age group from a free-text competition name, e.g. "State Cup U14A Boys".
+function extractAgeGroupFromText(text) {
+  const u = (text || '').toUpperCase()
+  const um = u.match(/\bU(\d+)/)
+  if (um) {
+    const age = parseInt(um[1], 10)
+    if (age >= 21) return 'Open / Senior'
+    if (age >= 18) return 'U18'
+    if (age >= 16) return 'U16'
+    if (age >= 15) return 'U15'
+    if (age >= 14) return 'U14'
+    return 'U12'
+  }
+  if (/\bOPEN\b|\bSENIOR\b/.test(u)) return 'Open / Senior'
+  return ''
+}
 
 // Convert various date representations to YYYY-MM-DD.
 // SheetJS with raw:false gives formatted strings (e.g. "25/05/2026", "25 May 2026").
@@ -95,13 +142,20 @@ export function parseExcelFixtures(buffer) {
     const awayTeam = get(row, C.awayClub)
     if (!homeTeam && !awayTeam) { skipped++; continue }
 
-    const ageGroup = get(row, C.league)
-    const isPremierLeague = PLM_PLR.has(ageGroup.toUpperCase())
+    const competition   = get(row, C.competition)
+    const leagueRaw     = get(row, C.league)
+    const mappedAge     = mapLeagueToAgeGroup(leagueRaw)
+    const isLeagueSRC   = mappedAge === null                        // SRC returns null
+    const isStateCup    = isLeagueSRC || STATE_CUP_RE.test(competition)
+    const ageGroup      = isLeagueSRC
+      ? extractAgeGroupFromText(competition)   // infer from competition name
+      : (mappedAge ?? leagueRaw)               // use mapped value or original
+    const isPremierLeague = PLM_PLR.has((ageGroup || '').toUpperCase())
 
     fixtures.push({
       kickoff_date:        parseDate(get(row, C.date)),
       kickoff_time:        parseTime(get(row, C.time)),
-      competition:         get(row, C.competition),
+      competition,
       age_group:           ageGroup,
       venue:               get(row, C.venue),
       home_team:           homeTeam,
@@ -110,13 +164,13 @@ export function parseExcelFixtures(buffer) {
       ar1:                 get(row, C.ar1),
       ar2:                 get(row, C.ar2),
       fourth_official:     get(row, C.fourth),
-      // rule defaults
+      // rule defaults — State Cup overrides sin bin and penalties
       half_length:         45,
       two_yellows_rule:    'red_card',
-      dissent_sin_bin:     true,
-      record_goal_scorers: isPremierLeague,
+      dissent_sin_bin:     !isStateCup,
+      record_goal_scorers: isPremierLeague || isStateCup,
       extra_time:          false,
-      penalties:           false,
+      penalties:           isStateCup,
       status:              'pending',
     })
   }

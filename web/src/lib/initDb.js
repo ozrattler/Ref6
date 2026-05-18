@@ -24,8 +24,13 @@ const MATCHES_SCHEMA = [
   f('home_colour',     'text'),
   f('away_colour',     'text'),
   f('venue',           'text'),
-  f('kickoff_date',    'text'),
-  f('kickoff_time',    'text'),
+  f('kickoff_date',      'text'),
+  f('kickoff_time',      'text'),
+  f('gps_track',         'text'),
+  f('total_distance_km', 'number'),
+  f('average_speed_kmh', 'number'),
+  f('max_speed_kmh',     'number'),
+  f('match_setup_id',    'text'),
 ]
 
 const MATCH_SETUPS_SCHEMA = [
@@ -80,6 +85,8 @@ function incidentsSchema(matchesId) {
     f('player_name',         'text'),
     f('offence_description', 'text'),
     f('goal_type',           'text'),
+    f('latitude',            'number'),
+    f('longitude',           'number'),
   ]
 }
 

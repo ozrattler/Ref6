@@ -58,6 +58,17 @@ fun FullTimeScreen(viewModel: MatchViewModel, onNewMatch: () -> Unit) {
             }
         }
 
+        if (state.kickoffDate.isNotEmpty() || state.kickoffTime.isNotEmpty()) {
+            item {
+                Text(
+                    text = listOf(state.kickoffDate, state.kickoffTime)
+                        .filter { it.isNotEmpty() }.joinToString("  "),
+                    style = MaterialTheme.typography.caption2,
+                    color = Color.Gray
+                )
+            }
+        }
+
         item {
             Row(
                 horizontalArrangement = Arrangement.SpaceEvenly,

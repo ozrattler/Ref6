@@ -44,14 +44,18 @@ fun CardScreen(
 
     var selectedTeam by remember { mutableStateOf(prefilledTeam) }
     var selectedCard by remember { mutableStateOf(prefilledCardType) }
-    var playerNumber by remember { mutableIntStateOf(1) }
+    var playerNumber by remember { mutableIntStateOf(0) }
+    var isCoach by remember { mutableStateOf(false) }
     var selectedOffence by remember { mutableStateOf<String?>(null) }
 
+    val playerIdentifier = if (isCoach) "Coach" else if (playerNumber > 0) "$playerNumber" else ""
     val isSecondYellow = selectedCard == CardType.YELLOW &&
         selectedTeam != null &&
-        state.playerYellowCount(selectedTeam!!, "$playerNumber") >= 1
+        playerIdentifier.isNotEmpty() &&
+        state.playerYellowCount(selectedTeam!!, playerIdentifier) >= 1
 
-    val isDissentSelected = selectedCard == CardType.YELLOW &&
+    val isDissentSelected = !isCoach &&
+        selectedCard == CardType.YELLOW &&
         selectedOffence == Offences.DISSENT &&
         !isSecondYellow
 
@@ -103,40 +107,48 @@ fun CardScreen(
                         selectedCard = it
                         selectedOffence = null
                     }
-                    CardTypeChip("SIN", CardType.SIN_BIN, RefOrange, selectedCard) {
-                        selectedCard = it
-                        selectedOffence = null
+                    if (!isCoach) {
+                        CardTypeChip("SIN", CardType.SIN_BIN, RefOrange, selectedCard) {
+                            selectedCard = it
+                            selectedOffence = null
+                        }
                     }
                 }
             }
         }
 
-        // Step: Player number
+        // Step: Player/Coach
         val playerStepNum = when {
             prefilledTeam != null && prefilledCardType != null -> "1"
             prefilledTeam != null || prefilledCardType != null -> "2"
             else -> "3"
         }
-        item { SectionLabel("$playerStepNum. Player #") }
+        item { SectionLabel("$playerStepNum. Player / Coach") }
         item {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                CompactChip(
-                    label = { Text("−") },
-                    onClick = { if (playerNumber > 1) playerNumber-- }
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                SelectChip(
+                    label = "Player",
+                    selected = !isCoach,
+                    onClick = { isCoach = false }
                 )
-                Text(
-                    text = "$playerNumber",
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.width(36.dp),
-                    textAlign = TextAlign.Center
+                SelectChip(
+                    label = "Coach",
+                    selected = isCoach,
+                    onClick = {
+                        isCoach = true
+                        if (selectedCard == CardType.SIN_BIN) {
+                            selectedCard = null
+                            selectedOffence = null
+                        }
+                    }
                 )
-                CompactChip(
-                    label = { Text("+") },
-                    onClick = { if (playerNumber < 99) playerNumber++ }
+            }
+        }
+        if (!isCoach) {
+            item {
+                PlayerNumberPicker(
+                    value = playerNumber,
+                    onValueChange = { playerNumber = it }
                 )
             }
         }
@@ -161,7 +173,8 @@ fun CardScreen(
             items(offences.size) { index ->
                 val offence = offences[index]
                 val isSelected = selectedOffence == offence
-                val isDissent = offence == Offences.DISSENT &&
+                val isDissent = !isCoach &&
+                    offence == Offences.DISSENT &&
                     selectedCard == CardType.YELLOW &&
                     !isSecondYellow
 
@@ -221,7 +234,7 @@ fun CardScreen(
             }
         }
 
-        if (selectedTeam != null && selectedCard != null && selectedOffence != null) {
+        if (selectedTeam != null && selectedCard != null && selectedOffence != null && (isCoach || playerNumber > 0)) {
             item { Spacer(modifier = Modifier.height(4.dp)) }
             item {
                 val chipColor = when {
@@ -236,7 +249,7 @@ fun CardScreen(
                     onClick = {
                         viewModel.recordCard(
                             team = selectedTeam!!,
-                            playerNumber = "$playerNumber",
+                            playerNumber = if (isCoach) "Coach" else "$playerNumber",
                             cardType = selectedCard!!,
                             offence = selectedOffence!!
                         )

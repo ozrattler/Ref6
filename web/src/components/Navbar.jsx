@@ -21,6 +21,9 @@ export default function Navbar({ onDbInit }) {
           <NavLink to="/history" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
             History
           </NavLink>
+          <NavLink to="/trends" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
+            Trends
+          </NavLink>
           <NavLink to="/setup" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
             Set Up
           </NavLink>

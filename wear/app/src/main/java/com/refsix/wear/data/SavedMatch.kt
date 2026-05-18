@@ -14,9 +14,17 @@ data class SavedMatch(
     val ageGroup: String = "",
     val competition: String = "",
     val status: String = "completed",
+    val gpsTrack: String = "",
+    val totalDistanceKm: Float = 0f,
+    val avgSpeedKmh: Float = 0f,
+    val maxSpeedKmh: Float = 0f,
+    val avgHeartRate: Int = 0,
+    val maxHeartRate: Int = 0,
     val events: List<MatchEvent>,
     val pocketBaseId: String? = null,
-    val matchSetupId: String? = null
+    val matchSetupId: String? = null,
+    val kickoffDate: String = "",
+    val kickoffTime: String = ""
 ) {
     fun toJson(): String = JSONObject().apply {
         put("id", id)
@@ -29,8 +37,16 @@ data class SavedMatch(
         put("ageGroup", ageGroup)
         put("competition", competition)
         put("status", status)
+        put("gpsTrack", gpsTrack)
+        put("totalDistanceKm", totalDistanceKm.toDouble())
+        put("avgSpeedKmh", avgSpeedKmh.toDouble())
+        put("maxSpeedKmh", maxSpeedKmh.toDouble())
+        put("avgHeartRate", avgHeartRate)
+        put("maxHeartRate", maxHeartRate)
         pocketBaseId?.let { put("pocketBaseId", it) }
         matchSetupId?.let { put("matchSetupId", it) }
+        if (kickoffDate.isNotEmpty()) put("kickoffDate", kickoffDate)
+        if (kickoffTime.isNotEmpty()) put("kickoffTime", kickoffTime)
         put("events", JSONArray().apply {
             events.forEach { e ->
                 put(JSONObject().apply {
@@ -42,6 +58,8 @@ data class SavedMatch(
                     put("half", e.half)
                     put("scorerNumber", e.scorerNumber)
                     put("scorerName", e.scorerName)
+                    e.lat?.let { put("lat", it) }
+                    e.lng?.let { put("lng", it) }
                 })
             }
         })
@@ -61,7 +79,9 @@ data class SavedMatch(
                     matchMinute = e.getInt("matchMinute"),
                     half = e.getInt("half"),
                     scorerNumber = e.optString("scorerNumber", ""),
-                    scorerName = e.optString("scorerName", "")
+                    scorerName = e.optString("scorerName", ""),
+                    lat = if (e.has("lat")) e.getDouble("lat") else null,
+                    lng = if (e.has("lng")) e.getDouble("lng") else null
                 )
             }
             return SavedMatch(
@@ -75,9 +95,17 @@ data class SavedMatch(
                 ageGroup = o.optString("ageGroup", ""),
                 competition = o.optString("competition", ""),
                 status = o.optString("status", "completed"),
+                gpsTrack = o.optString("gpsTrack", ""),
+                totalDistanceKm = o.optDouble("totalDistanceKm", 0.0).toFloat(),
+                avgSpeedKmh = o.optDouble("avgSpeedKmh", 0.0).toFloat(),
+                maxSpeedKmh = o.optDouble("maxSpeedKmh", 0.0).toFloat(),
+                avgHeartRate = o.optInt("avgHeartRate", 0),
+                maxHeartRate = o.optInt("maxHeartRate", 0),
                 events = events,
                 pocketBaseId = o.optString("pocketBaseId", "").takeIf { it.isNotEmpty() },
-                matchSetupId = o.optString("matchSetupId", "").takeIf { it.isNotEmpty() }
+                matchSetupId = o.optString("matchSetupId", "").takeIf { it.isNotEmpty() },
+                kickoffDate = o.optString("kickoffDate", ""),
+                kickoffTime = o.optString("kickoffTime", "")
             )
         }
     }

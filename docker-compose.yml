@@ -1,0 +1,16 @@
+services:
+  ref6-web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    image: ref6-web:latest
+    container_name: ref6-web
+    ports:
+      - "8181:80"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3

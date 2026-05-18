@@ -3,6 +3,20 @@ import { pb } from '../lib/pb'
 import FixtureFormFields from '../components/FixtureFormFields'
 import TemplateManager from '../components/TemplateManager'
 
+const PRESET_TEMPLATES = [
+  {
+    id:                  '__preset_state_cup__',
+    name:                'State Cup',
+    competition:         'State Cup',
+    age_group:           'Open / Senior',
+    half_length:         45,
+    dissent_sin_bin:     false,
+    record_goal_scorers: true,
+    extra_time:          false,
+    penalties:           true,
+  },
+]
+
 const DEFAULT_FORM = {
   competition:       'SSFA Winter 2026',
   venue:             '',
@@ -233,8 +247,24 @@ function TemplatePickerModal({ templates, onSelect, onClose }) {
     <div className="modal-backdrop" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className="modal modal-tall">
         <div className="modal-title">Load Template</div>
+
+        <div className="template-group-label">Built-in</div>
+        <div className="template-list">
+          {PRESET_TEMPLATES.map(t => (
+            <button key={t.id} className="template-item" onClick={() => onSelect(t)}>
+              <div className="template-item-body">
+                <div className="template-item-name">{t.name}</div>
+                <div className="template-item-detail">
+                  Sin bin off · Penalties on · Goal scorers on
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+
+        <div className="template-group-label">Saved</div>
         {templates.length === 0 ? (
-          <p style={{ color: 'var(--muted)', fontSize: '0.9rem', padding: '8px 0' }}>
+          <p style={{ color: 'var(--muted)', fontSize: '0.9rem', padding: '4px 0 8px' }}>
             No templates saved yet. Fill in the form and click "Save as Template".
           </p>
         ) : (
@@ -251,6 +281,7 @@ function TemplatePickerModal({ templates, onSelect, onClose }) {
             ))}
           </div>
         )}
+
         <div className="modal-actions">
           <button className="btn-ghost" onClick={onClose}>Close</button>
         </div>

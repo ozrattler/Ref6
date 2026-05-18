@@ -62,6 +62,17 @@ fun MatchReportContent(match: SavedMatch, onDone: () -> Unit) {
             )
         }
 
+        if (match.kickoffDate.isNotEmpty() || match.kickoffTime.isNotEmpty()) {
+            item {
+                Text(
+                    text = listOf(match.kickoffDate, match.kickoffTime)
+                        .filter { it.isNotEmpty() }.joinToString("  "),
+                    style = MaterialTheme.typography.caption2,
+                    color = Color.Gray
+                )
+            }
+        }
+
         item {
             Text(
                 text = "${match.homeScore}  –  ${match.awayScore}",

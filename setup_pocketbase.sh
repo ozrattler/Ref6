@@ -122,8 +122,14 @@ ensure_fields "$MATCHES_ID" "matches" \
     '{"name":"home_colour",     "type":"text","required":false,"options":{}}' \
     '{"name":"away_colour",     "type":"text","required":false,"options":{}}' \
     '{"name":"venue",           "type":"text","required":false,"options":{}}' \
-    '{"name":"kickoff_date",    "type":"text","required":false,"options":{}}' \
-    '{"name":"kickoff_time",    "type":"text","required":false,"options":{}}'
+    '{"name":"kickoff_date",      "type":"text",  "required":false,"options":{}}' \
+    '{"name":"kickoff_time",      "type":"text",  "required":false,"options":{}}' \
+    '{"name":"gps_track",         "type":"text",  "required":false,"options":{}}' \
+    '{"name":"total_distance_km", "type":"number","required":false,"options":{}}' \
+    '{"name":"average_speed_kmh", "type":"number","required":false,"options":{}}' \
+    '{"name":"max_speed_kmh",     "type":"number","required":false,"options":{}}' \
+    '{"name":"avg_heart_rate",    "type":"number","required":false,"options":{}}' \
+    '{"name":"max_heart_rate",    "type":"number","required":false,"options":{}}'
 set_public_rules "$MATCHES_ID"
 echo "  matches id: $MATCHES_ID"
 
@@ -144,7 +150,10 @@ INCIDENTS_BODY=$(jq -n --arg cid "$MATCHES_ID" '{
 }')
 INCIDENTS_ID=$(get_or_create_collection "incidents" "$INCIDENTS_BODY")
 ensure_fields "$INCIDENTS_ID" "incidents" \
-    '{"name":"half","type":"number","required":false,"options":{}}'
+    '{"name":"half",      "type":"number","required":false,"options":{}}' \
+    '{"name":"goal_type", "type":"text",  "required":false,"options":{}}' \
+    '{"name":"latitude",  "type":"number","required":false,"options":{}}' \
+    '{"name":"longitude", "type":"number","required":false,"options":{}}'
 set_public_rules "$INCIDENTS_ID"
 echo "  incidents id: $INCIDENTS_ID"
 
@@ -177,7 +186,8 @@ ensure_fields "$MATCH_SETUPS_ID" "match_setups" \
     '{"name":"dissent_sin_bin",      "type":"bool","required":false,"options":{}}' \
     '{"name":"record_goal_scorers",  "type":"bool","required":false,"options":{}}' \
     '{"name":"extra_time",           "type":"bool","required":false,"options":{}}' \
-    '{"name":"penalties",            "type":"bool","required":false,"options":{}}'
+    '{"name":"penalties",            "type":"bool","required":false,"options":{}}' \
+    '{"name":"ical_uid",             "type":"text","required":false,"options":{}}'
 set_public_rules "$MATCH_SETUPS_ID"
 echo "  match_setups id: $MATCH_SETUPS_ID"
 

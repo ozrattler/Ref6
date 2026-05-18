@@ -1,6 +1,8 @@
 package com.refsix.wear.data
 
 import android.content.Context
+import org.json.JSONArray
+import org.json.JSONObject
 
 class MatchStorage(context: Context) {
     private val prefs = context.getSharedPreferences("ref6_history", Context.MODE_PRIVATE)
@@ -16,8 +18,16 @@ class MatchStorage(context: Context) {
             ageGroup = state.ageGroup.label,
             competition = state.competitionType.label,
             status = status,
+            gpsTrack = buildGpsTrackJson(state),
+            totalDistanceKm = state.totalDistanceKm,
+            avgSpeedKmh = state.avgSpeedKmh,
+            maxSpeedKmh = state.maxSpeedKmh,
+            avgHeartRate = state.avgHeartRate,
+            maxHeartRate = state.maxHeartRate,
             events = state.events,
-            matchSetupId = state.matchSetupId
+            matchSetupId = state.matchSetupId,
+            kickoffDate = state.kickoffDate,
+            kickoffTime = state.kickoffTime
         )
         val existing = loadMatches().toMutableList()
         existing.add(0, match)
@@ -56,5 +66,19 @@ class MatchStorage(context: Context) {
 
     companion object {
         private const val MAX_MATCHES = 5
+
+        fun buildGpsTrackJson(state: MatchState): String {
+            if (state.gpsPoints.isEmpty()) return ""
+            val arr = JSONArray()
+            state.gpsPoints.forEach { p ->
+                arr.put(JSONObject().apply {
+                    put("latitude",   p.lat)
+                    put("longitude",  p.lng)
+                    put("timestamp",  p.timestamp)
+                    put("match_time", p.matchMinute)
+                })
+            }
+            return arr.toString()
+        }
     }
 }

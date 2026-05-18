@@ -26,12 +26,14 @@ data class MatchSetupData(
     val ageGroup: AgeGroup,
     val competitionType: CompetitionType,
     val sinBinMinutes: Int,
-    val competition: String
+    val competition: String,
+    val kickoffDate: String = "",
+    val kickoffTime: String = ""
 )
 
 class PocketBaseSync(private val context: Context) {
 
-    private val baseUrl = "http://192.168.1.106:8090/api/collections"
+    private val baseUrl = "https://refappb.duckdns.org/api/collections"
     private val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS'Z'", Locale.US).apply {
         timeZone = TimeZone.getTimeZone("UTC")
     }
@@ -108,7 +110,9 @@ class PocketBaseSync(private val context: Context) {
                     ageGroup = ageGroup,
                     competitionType = compType,
                     sinBinMinutes = ageGroup.sinBinMinutes,
-                    competition = competition
+                    competition = competition,
+                    kickoffDate = item.optString("kickoff_date", ""),
+                    kickoffTime = item.optString("kickoff_time", "")
                 )
             }
         } catch (e: Exception) {
@@ -129,6 +133,17 @@ class PocketBaseSync(private val context: Context) {
                 put("age_group", match.ageGroup)
                 put("half_length", match.halfLengthMinutes)
                 put("status", match.status)
+                match.matchSetupId?.let { put("match_setup_id", it) }
+                if (match.gpsTrack.isNotEmpty()) {
+                    put("gps_track",        match.gpsTrack)
+                    put("total_distance_km",  match.totalDistanceKm.toDouble())
+                    put("average_speed_kmh",  match.avgSpeedKmh.toDouble())
+                    put("max_speed_kmh",      match.maxSpeedKmh.toDouble())
+                }
+                if (match.avgHeartRate > 0) {
+                    put("avg_heart_rate", match.avgHeartRate)
+                    put("max_heart_rate", match.maxHeartRate)
+                }
             }
             Log.d(TAG, "syncMatch: posting match ${match.homeTeam} vs ${match.awayTeam}")
             val pbMatchId = postJson("$baseUrl/matches/records", matchBody)
@@ -148,6 +163,8 @@ class PocketBaseSync(private val context: Context) {
                     if (event.type == EventType.GOAL && event.detail.isNotEmpty()) {
                         put("goal_type", event.detail)
                     }
+                    event.lat?.let { put("latitude", it) }
+                    event.lng?.let { put("longitude", it) }
                 }
                 postJson("$baseUrl/incidents/records", incidentBody)
             }
@@ -163,10 +180,6 @@ class PocketBaseSync(private val context: Context) {
             Log.e(TAG, "syncMatch: exception", e)
             null
         }
-    }
-
-    suspend fun consumeSetup(setupId: String) = withContext(Dispatchers.IO) {
-        patchSetupStatus(setupId, "abandoned")
     }
 
     private fun patchSetupStatus(id: String, status: String) {

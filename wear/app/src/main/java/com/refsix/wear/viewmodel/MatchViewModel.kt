@@ -2,6 +2,7 @@ package com.refsix.wear.viewmodel
 
 import android.Manifest
 import android.app.Application
+import android.app.NotificationManager
 import android.content.pm.PackageManager
 import android.location.Location
 import android.util.Log
@@ -16,6 +17,7 @@ import com.refsix.wear.data.CompetitionType
 import com.refsix.wear.data.EventType
 import com.refsix.wear.data.GpsPoint
 import com.refsix.wear.data.GpsTracker
+import com.refsix.wear.data.HeartRateTracker
 import com.refsix.wear.data.MatchEvent
 import com.refsix.wear.data.MatchPhase
 import com.refsix.wear.data.MatchState
@@ -44,7 +46,6 @@ sealed class MatchUiEvent {
     object HalfTimeAlert : MatchUiEvent()
     object FullTimeAlert : MatchUiEvent()
     object HalfTimeCountdownExpired : MatchUiEvent()
-    object MatchAbandoned : MatchUiEvent()
 }
 
 class MatchViewModel(application: Application) : AndroidViewModel(application) {
@@ -52,7 +53,14 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
     private val matchStorage = MatchStorage(application)
     private val pocketBaseSync = PocketBaseSync(application)
     private val gpsTracker = GpsTracker(application)
+    private val heartRateTracker = HeartRateTracker(application)
+    private val notificationManager: NotificationManager? =
+        application.getSystemService(NotificationManager::class.java)
     private var gpsActive = false
+    private var hrActive = false
+    private var lastLocation: Location? = null
+    private var lastHrSampleMs = 0L
+    private var savedInterruptionFilter = NotificationManager.INTERRUPTION_FILTER_UNKNOWN
 
     private val _state = MutableStateFlow(MatchState())
     val state: StateFlow<MatchState> = _state.asStateFlow()
@@ -90,6 +98,7 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { syncUnsyncedMatches() }
         refreshPendingSetup()
         observeRunningForGps()
+        observeRunningForDnd()
     }
 
     private fun launchTimer() {
@@ -126,12 +135,38 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // ── DND (notification suppression) ───────────────────────────────────────
+
+    private fun observeRunningForDnd() {
+        viewModelScope.launch {
+            _state.map { it.isRunning }.distinctUntilChanged().collect { running ->
+                val nm = notificationManager ?: return@collect
+                if (!nm.isNotificationPolicyAccessGranted) return@collect
+                if (running) {
+                    savedInterruptionFilter = nm.currentInterruptionFilter
+                    nm.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_NONE)
+                } else {
+                    val restore = if (savedInterruptionFilter != NotificationManager.INTERRUPTION_FILTER_UNKNOWN)
+                        savedInterruptionFilter else NotificationManager.INTERRUPTION_FILTER_ALL
+                    nm.setInterruptionFilter(restore)
+                    savedInterruptionFilter = NotificationManager.INTERRUPTION_FILTER_UNKNOWN
+                }
+            }
+        }
+    }
+
     // ── GPS tracking ─────────────────────────────────────────────────────────
 
     private fun observeRunningForGps() {
         viewModelScope.launch {
             _state.map { it.isRunning }.distinctUntilChanged().collect { running ->
-                if (running) startGpsTracking() else stopGpsTracking()
+                if (running) {
+                    startGpsTracking()
+                    startHeartRateTracking()
+                } else {
+                    stopGpsTracking()
+                    stopHeartRateTracking()
+                }
             }
         }
     }
@@ -155,52 +190,100 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
         _state.update { it.copy(hasGpsFix = false) }
     }
 
+    private fun startHeartRateTracking() {
+        if (hrActive || !heartRateTracker.isAvailable) return
+        val app = getApplication<Application>()
+        if (ContextCompat.checkSelfPermission(app, Manifest.permission.BODY_SENSORS)
+            != PackageManager.PERMISSION_GRANTED) return
+        hrActive = true
+        heartRateTracker.startTracking { bpm -> processHeartRate(bpm) }
+    }
+
+    private fun stopHeartRateTracking() {
+        if (!hrActive) return
+        hrActive = false
+        heartRateTracker.stopTracking()
+        _state.update { it.copy(currentHeartRate = 0) }
+    }
+
+    private fun processHeartRate(bpm: Int) {
+        val now = System.currentTimeMillis()
+        val doSample = now - lastHrSampleMs >= 10_000L
+        if (doSample) lastHrSampleMs = now
+        _state.update { s ->
+            if (!s.isRunning) return@update s
+            val readings = if (doSample) s.heartRateReadings + bpm else s.heartRateReadings
+            s.copy(
+                currentHeartRate = bpm,
+                heartRateReadings = readings,
+                avgHeartRate = if (readings.isNotEmpty()) readings.average().toInt() else 0,
+                maxHeartRate = maxOf(s.maxHeartRate, bpm)
+            )
+        }
+    }
+
     private fun processGpsLocation(location: Location) {
         if (location.hasAccuracy() && location.accuracy > 50f) return
-        val speedMs = if (location.hasSpeed()) location.speed else 0f
+        val rawSpeedMs = if (location.hasSpeed()) location.speed else 0f
+        lastLocation = location
 
         _state.update { s ->
             if (!s.isRunning) return@update s
 
+            val now = System.currentTimeMillis()
             val newPoint = GpsPoint(
-                timestamp = System.currentTimeMillis(),
+                timestamp = now,
                 matchMinute = s.currentMatchMinute,
                 half = s.currentHalf,
                 lat = location.latitude,
                 lng = location.longitude,
                 accuracyMeters = if (location.hasAccuracy()) location.accuracy else 0f,
-                speedMs = speedMs
+                speedMs = rawSpeedMs
             )
 
+            // Only count distance between consecutive points when the implied speed
+            // is plausible (≤ 20 km/h). GPS drift between updates produces large
+            // coordinate jumps that would otherwise inflate both distance and speed.
             val distanceAdded = if (s.gpsPoints.isNotEmpty()) {
                 val prev = s.gpsPoints.last()
-                val timeDeltaSec = (newPoint.timestamp - prev.timestamp) / 1000L
-                if (timeDeltaSec <= 15L) {
+                val timeDeltaSec = (now - prev.timestamp) / 1000L
+                if (timeDeltaSec in 1L..15L) {
                     val results = FloatArray(1)
                     Location.distanceBetween(prev.lat, prev.lng, newPoint.lat, newPoint.lng, results)
-                    results[0]
+                    val impliedSpeedMs = results[0] / timeDeltaSec
+                    if (impliedSpeedMs <= MAX_PLAUSIBLE_SPEED_MS) results[0] else 0f
                 } else 0f
             } else 0f
 
-            // cap max speed at 10 m/s (~36 km/h) to ignore GPS glitches
-            val newMax = if (speedMs < 10f) maxOf(s.maxSpeedMs, speedMs) else s.maxSpeedMs
+            // GPS-reported speed: accept only readings ≤ 20 km/h.
+            val validSpeed = rawSpeedMs.takeIf { it in 0.1f..MAX_PLAUSIBLE_SPEED_MS }
+            val newMax = if (validSpeed != null) maxOf(s.maxSpeedMs, validSpeed) else s.maxSpeedMs
+            val newCount = if (validSpeed != null) s.validSpeedCount + 1 else s.validSpeedCount
+            val newSum   = if (validSpeed != null) s.totalValidSpeedSum + validSpeed else s.totalValidSpeedSum
 
             s.copy(
                 gpsPoints = s.gpsPoints + newPoint,
                 totalDistanceMeters = s.totalDistanceMeters + distanceAdded,
                 maxSpeedMs = newMax,
+                validSpeedCount = newCount,
+                totalValidSpeedSum = newSum,
                 hasGpsFix = true
             )
         }
     }
 
+    companion object {
+        private const val MAX_PLAUSIBLE_SPEED_MS = 3.333f  // 12 km/h
+    }
+
     fun signalReturnToCenter() { _returnToCenterCount.update { it + 1 } }
 
-    fun updateSetup(homeTeam: String, awayTeam: String) {
+    fun updateSetup(homeTeam: String, awayTeam: String, kickOffTeam: String = "") {
         _state.update {
             it.copy(
                 homeTeam = homeTeam.ifBlank { "Home" },
-                awayTeam = awayTeam.ifBlank { "Away" }
+                awayTeam = awayTeam.ifBlank { "Away" },
+                kickOffTeam = kickOffTeam
             )
         }
     }
@@ -221,7 +304,13 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
                 gpsPoints = emptyList(),
                 totalDistanceMeters = 0f,
                 maxSpeedMs = 0f,
-                hasGpsFix = false
+                hasGpsFix = false,
+                validSpeedCount = 0,
+                totalValidSpeedSum = 0f,
+                currentHeartRate = 0,
+                avgHeartRate = 0,
+                maxHeartRate = 0,
+                heartRateReadings = emptyList()
             )
         }
     }
@@ -313,10 +402,11 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
                 halfLengthMinutes = setup.halfLengthMinutes,
                 competitionType = setup.competitionType,
                 sinBinMinutes = setup.sinBinMinutes,
-                matchSetupId = setup.id
+                matchSetupId = setup.id,
+                kickoffDate = setup.kickoffDate,
+                kickoffTime = setup.kickoffTime
             )
         }
-        // Setup remains "pending" in PocketBase until full-time sync marks it "completed"
     }
 
     fun consumeAppliedSetup() {
@@ -328,6 +418,7 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun recordGoal(team: String, scorerNumber: String = "", scorerName: String = "", goalType: String = "") {
+        val loc = lastLocation
         _state.update { s ->
             val isHome = team == s.homeTeam
             val event = MatchEvent(
@@ -337,7 +428,9 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
                 half = s.currentHalf,
                 scorerNumber = scorerNumber,
                 scorerName = scorerName,
-                detail = goalType
+                detail = goalType,
+                lat = loc?.latitude,
+                lng = loc?.longitude
             )
             s.copy(
                 homeScore = if (isHome) s.homeScore + 1 else s.homeScore,
@@ -348,6 +441,7 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun recordCard(team: String, playerNumber: String, cardType: CardType, offence: String) {
+        val loc = lastLocation
         _state.update { s ->
             val minute = s.currentMatchMinute
             val half = s.currentHalf
@@ -365,7 +459,9 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
                 playerNumber = playerNumber,
                 detail = offence,
                 matchMinute = minute,
-                half = half
+                half = half,
+                lat = loc?.latitude,
+                lng = loc?.longitude
             )
 
             val newEvents: List<MatchEvent>
@@ -388,7 +484,9 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
                         playerNumber = playerNumber,
                         detail = "Second caution",
                         matchMinute = minute,
-                        half = half
+                        half = half,
+                        lat = loc?.latitude,
+                        lng = loc?.longitude
                     )
                     newEvents = s.events + cardEvent + autoRed
                     updatedSinBins = s.sinBins.filterNot {
@@ -439,31 +537,6 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
 
     fun returnFromSinBin(sinBinId: Long) {
         _state.update { s -> s.copy(sinBins = s.sinBins.filter { it.id != sinBinId }) }
-    }
-
-    // Save=Yes: save partial match as abandoned, sync to PocketBase (setup gets consumed by sync).
-    fun abandonMatch() {
-        halfTimeCountdownJob?.cancel()
-        _halfTimeCountdown.value = 0
-        _state.update { it.copy(isRunning = false) }
-        matchStorage.saveMatch(_state.value, status = "abandoned")
-        _savedMatches.value = matchStorage.loadMatches()
-        _state.value = MatchState()
-        viewModelScope.launch {
-            _uiEvents.emit(MatchUiEvent.MatchAbandoned)
-            syncUnsyncedMatches()
-        }
-    }
-
-    // Save=No, Keep=No: discard match data and mark setup consumed in PocketBase.
-    fun discardAndConsumeSetup() {
-        val setupId = _state.value.matchSetupId
-        halfTimeCountdownJob?.cancel()
-        _halfTimeCountdown.value = 0
-        _state.value = MatchState()
-        if (setupId != null) {
-            viewModelScope.launch { pocketBaseSync.consumeSetup(setupId) }
-        }
     }
 
     fun clearHistory() {

@@ -6,6 +6,7 @@ import FixtureDetail from './pages/FixtureDetail'
 import MatchHistory from './pages/MatchHistory'
 import MatchDetail from './pages/MatchDetail'
 import MatchSetup from './pages/MatchSetup'
+import Trends from './pages/Trends'
 import { pb } from './lib/pb'
 import { checkDb } from './lib/initDb'
 
@@ -46,6 +47,7 @@ export default function App() {
           <Route path="/history"     element={<MatchHistory />} />
           <Route path="/match/:id"   element={<MatchDetail />} />
           <Route path="/setup"       element={<MatchSetup />} />
+          <Route path="/trends"      element={<Trends />} />
           <Route path="*"            element={<Navigate to="/" replace />} />
         </Routes>
       </main>

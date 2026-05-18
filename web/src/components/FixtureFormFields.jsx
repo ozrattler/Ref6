@@ -3,21 +3,48 @@ import { useState, useEffect, useRef } from 'react'
 // SPL/SPLR kept for backward compat with records created before rename
 export const SPL_AGE_GROUPS = new Set(['PLM', 'PLR', 'SPL', 'SPLR'])
 
+export function isStateCupCompetition(s) {
+  const u = (s || '').toUpperCase()
+  return u.includes('STATE CUP') || /(?<!\w)SRC(?!\w)/.test(u)
+}
+
 export const AGE_GROUPS = [
   { label: 'PLM',           halfLength: 45 },
   { label: 'PLR',           halfLength: 45 },
   { label: 'Open / Senior', halfLength: 45 },
+  { label: 'U18',           halfLength: 40 },
   { label: 'U16',           halfLength: 35 },
   { label: 'U15',           halfLength: 35 },
   { label: 'U14',           halfLength: 30 },
   { label: 'U12',           halfLength: 25 },
 ]
 
+// Infer an age group from a free-text competition/description string.
+function extractAgeGroupFromText(text) {
+  const u = (text || '').toUpperCase()
+  const um = u.match(/\bU(\d+)/)
+  if (um) {
+    const age = parseInt(um[1], 10)
+    if (age >= 21) return 'Open / Senior'
+    if (age >= 18) return 'U18'
+    if (age >= 16) return 'U16'
+    if (age >= 15) return 'U15'
+    if (age >= 14) return 'U14'
+    return 'U12'
+  }
+  if (/\bOPEN\b|\bSENIOR\b/.test(u)) return 'Open / Senior'
+  return ''
+}
+
 export const KIT_COLOURS = [
-  ['#dc2626', 'Red'],    ['#ea580c', 'Orange'], ['#ca8a04', 'Amber'],
-  ['#16a34a', 'Green'],  ['#2563eb', 'Blue'],   ['#7c3aed', 'Purple'],
-  ['#db2777', 'Pink'],   ['#0891b2', 'Teal'],   ['#92400e', 'Maroon'],
-  ['#ffffff', 'White'],  ['#9ca3af', 'Silver'],  ['#111827', 'Black'],
+  ['#166534', 'Dark Green'],   ['#16a34a', 'Light Green'],
+  ['#1e3a8a', 'Dark Blue'],    ['#0ea5e9', 'Sky Blue'],
+  ['#991b1b', 'Dark Red'],     ['#7f1d1d', 'Maroon'],
+  ['#854d0e', 'Dark Yellow'],  ['#d97706', 'Gold'],
+  ['#581c87', 'Dark Purple'],  ['#a78bfa', 'Lavender'],
+  ['#9a3412', 'Dark Orange'],  ['#f59e0b', 'Amber'],
+  ['#111827', 'Black'],        ['#ffffff', 'White'],
+  ['#6b7280', 'Grey'],         ['#374151', 'Dark Grey'],
 ]
 
 export function KitSwatchBtn({ value, onChange }) {
@@ -132,6 +159,22 @@ export default function FixtureFormFields({ form, set }) {
     }
   }
 
+  function onCompetitionChange(value) {
+    set('competition', value)
+    if (isStateCupCompetition(value)) {
+      set('dissentSinBin',     false)
+      set('penalties',         true)
+      set('recordGoalScorers', true)
+      // Auto-set age group from competition text (e.g. "State Cup U14A" → U14)
+      const ag = extractAgeGroupFromText(value)
+      if (ag) {
+        set('ageGroup', ag)
+        const agObj = AGE_GROUPS.find(a => a.label === ag)
+        if (agObj) set('halfLength', agObj.halfLength)
+      }
+    }
+  }
+
   return (
     <>
       {/* ── Competition Details ── */}
@@ -140,7 +183,7 @@ export default function FixtureFormFields({ form, set }) {
       <div className="form-group">
         <label className="form-label">Competition <span className="form-optional">(optional)</span></label>
         <input className="form-input" value={form.competition}
-          onChange={e => set('competition', e.target.value)}
+          onChange={e => onCompetitionChange(e.target.value)}
           placeholder="e.g. SSFA Winter 2026" autoComplete="off" />
       </div>
 

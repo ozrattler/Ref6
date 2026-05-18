@@ -4,11 +4,13 @@ import { pb } from '../lib/pb'
 import { kitStyle } from '../lib/colours'
 import { syncCalendar, getLastSync, formatSyncTime } from '../lib/calendarSync'
 
+const AEST = { timeZone: 'Australia/Sydney' }
+
 function formatDayHeader(dateStr) {
   if (!dateStr) return 'Unknown date'
   try {
     const d = new Date(dateStr + 'T00:00:00')
-    const opts = { weekday: 'long', day: 'numeric', month: 'long' }
+    const opts = { weekday: 'long', day: 'numeric', month: 'long', ...AEST }
     if (d.getFullYear() !== new Date().getFullYear()) opts.year = 'numeric'
     return d.toLocaleDateString('en-AU', opts)
   } catch {
@@ -36,9 +38,9 @@ function countdown(dateStr, timeStr) {
   if (diffMins < 120)  return { label: `${Math.round(diffMins / 60)} hr away`, cls: 'cd-urgent' }
   if (diffMins < 240)  return { label: `${Math.round(diffMins / 60)} hrs away`, cls: 'cd-soon' }
 
-  const todayStr = now.toISOString().slice(0, 10)
-  const tmrw = new Date(now); tmrw.setDate(tmrw.getDate() + 1)
-  const tmrwStr = tmrw.toISOString().slice(0, 10)
+  const aestFmt = new Intl.DateTimeFormat('en-CA', AEST)
+  const todayStr = aestFmt.format(now)
+  const tmrwStr  = aestFmt.format(new Date(now.getTime() + 86400000))
   if (dateStr === tmrwStr) return { label: 'Tomorrow', cls: 'cd-soon' }
   if (dateStr === todayStr) return { label: 'Today', cls: 'cd-soon' }
 
@@ -56,6 +58,7 @@ export default function Fixtures() {
   const [syncMsg,       setSyncMsg]       = useState(null)   // {text, ok}
   const [lastSync,      setLastSync]      = useState(() => getLastSync())
   const [restoring,     setRestoring]     = useState(null)   // id being restored
+  const [deleting,      setDeleting]      = useState(null)   // id being deleted
   const [importModal,   setImportModal]   = useState(null)   // null | parsed state
   const fileInputRef = useRef(null)
   const navigate = useNavigate()
@@ -71,8 +74,9 @@ export default function Fixtures() {
             const db = (b.kickoff_date || '9999-12-31') + 'T' + (b.kickoff_time || '00:00')
             return da.localeCompare(db)
           })
+        const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
         const loaded = r.items
-          .filter(f => f.status === 'loaded')
+          .filter(f => f.status === 'loaded' && new Date(f.updated) >= cutoff)
           .sort((a, b) => b.updated?.localeCompare(a.updated ?? '') ?? 0)
         setFixtures(pending)
         setLoadedSetups(loaded)
@@ -88,6 +92,19 @@ export default function Fixtures() {
       loadFixtures()
     } finally {
       setRestoring(null)
+    }
+  }
+
+  async function handleDeleteLoaded(id) {
+    if (!window.confirm('Permanently delete this record from PocketBase? This cannot be undone.')) return
+    setDeleting(id)
+    try {
+      await pb.collection('match_setups').delete(id, { requestKey: null })
+      setLoadedSetups(prev => prev.filter(f => f.id !== id))
+    } catch (err) {
+      console.error('Delete failed:', err)
+    } finally {
+      setDeleting(null)
     }
   }
 
@@ -225,8 +242,10 @@ export default function Fixtures() {
               key={f.id}
               fixture={f}
               restoring={restoring === f.id}
+              deleting={deleting === f.id}
               onRestore={() => handleRestore(f.id)}
               onEdit={() => navigate(`/fixture/${f.id}`)}
+              onDelete={() => handleDeleteLoaded(f.id)}
             />
           ))}
         </div>
@@ -317,7 +336,7 @@ function ExcelImportModal({ state, onConfirm, onClose }) {
   )
 }
 
-function LoadedFixtureCard({ fixture: f, restoring, onRestore, onEdit }) {
+function LoadedFixtureCard({ fixture: f, restoring, deleting, onRestore, onEdit, onDelete }) {
   return (
     <div className="loaded-fixture-card">
       <div className="loaded-fixture-info">
@@ -336,10 +355,13 @@ function LoadedFixtureCard({ fixture: f, restoring, onRestore, onEdit }) {
         )}
       </div>
       <div className="loaded-fixture-actions">
-        <button className="btn-restore" onClick={onRestore} disabled={restoring}>
+        <button className="btn-restore" onClick={onRestore} disabled={restoring || deleting}>
           {restoring ? 'Restoring…' : 'Restore'}
         </button>
-        <button className="btn-edit" onClick={onEdit}>Edit</button>
+        <button className="btn-edit" onClick={onEdit} disabled={deleting}>Edit</button>
+        <button className="btn-delete-sm" onClick={onDelete} disabled={restoring || deleting}>
+          {deleting ? '…' : 'Delete'}
+        </button>
       </div>
     </div>
   )

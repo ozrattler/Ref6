@@ -31,6 +31,7 @@ fun SetupScreen(
 
     var homeTeam by remember { mutableStateOf(state.homeTeam) }
     var awayTeam by remember { mutableStateOf(state.awayTeam) }
+    var kickOffKey by remember { mutableStateOf("") }  // "home", "away", or ""
 
     val hasData = homeTeam.isNotBlank() || awayTeam.isNotBlank() || state.matchSetupId != null
 
@@ -39,6 +40,7 @@ fun SetupScreen(
         appliedSetup?.let { setup ->
             homeTeam = setup.homeTeam.ifBlank { "Home" }
             awayTeam = setup.awayTeam.ifBlank { "Away" }
+            kickOffKey = ""
             viewModel.consumeAppliedSetup()
         }
     }
@@ -91,13 +93,51 @@ fun SetupScreen(
         }
         item { TeamNameField(value = awayTeam, onValueChange = { awayTeam = it }) }
 
+        item {
+            Text(
+                text = "1st Half Kick-off",
+                style = MaterialTheme.typography.caption1,
+                color = Color.Gray
+            )
+        }
+        item {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                val effectiveHome = homeTeam.ifBlank { "Home" }
+                val effectiveAway = awayTeam.ifBlank { "Away" }
+                CompactChip(
+                    label = { Text(effectiveHome.take(8), fontWeight = FontWeight.Bold) },
+                    onClick = { kickOffKey = if (kickOffKey == "home") "" else "home" },
+                    colors = ChipDefaults.chipColors(
+                        backgroundColor = if (kickOffKey == "home") RefGreen else Color(0xFF2A2A2A)
+                    )
+                )
+                CompactChip(
+                    label = { Text(effectiveAway.take(8), fontWeight = FontWeight.Bold) },
+                    onClick = { kickOffKey = if (kickOffKey == "away") "" else "away" },
+                    colors = ChipDefaults.chipColors(
+                        backgroundColor = if (kickOffKey == "away") RefGreen else Color(0xFF2A2A2A)
+                    )
+                )
+            }
+        }
+
         item { Spacer(modifier = Modifier.height(4.dp)) }
 
         item {
             Chip(
                 label = { Text("START MATCH", fontWeight = FontWeight.Bold) },
                 onClick = {
-                    viewModel.updateSetup(homeTeam, awayTeam)
+                    val effectiveHome = homeTeam.ifBlank { "Home" }
+                    val effectiveAway = awayTeam.ifBlank { "Away" }
+                    val kickOffTeam = when (kickOffKey) {
+                        "home" -> effectiveHome
+                        "away" -> effectiveAway
+                        else -> ""
+                    }
+                    viewModel.updateSetup(homeTeam, awayTeam, kickOffTeam)
                     viewModel.startMatch()
                     onStartMatch()
                 },
