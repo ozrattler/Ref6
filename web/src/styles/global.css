@@ -1731,6 +1731,295 @@ body {
 .tr-bar-pct { color: var(--muted); font-weight: 400; font-size: 0.73rem; }
 .tr-empty { font-size: 0.875rem; color: var(--muted); padding: 8px 0; }
 
+/* ── Live nav link ── */
+.nav-link-live { position: relative; }
+.nav-link-live::after {
+  content: '';
+  position: absolute;
+  top: 6px; right: 5px;
+  width: 6px; height: 6px;
+  background: #ef4444;
+  border-radius: 50%;
+  animation: live-pulse 1.8s ease-in-out infinite;
+}
+.nav-link-live.active::after { background: #ef4444; }
+
+/* ── Live Match page ── */
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: .25; }
+}
+
+.live-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(239,68,68,.18);
+  color: #f87171;
+  border: 1px solid rgba(239,68,68,.4);
+  border-radius: 99px;
+  padding: 3px 10px 3px 8px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.live-dot {
+  display: inline-block;
+  width: 7px; height: 7px;
+  background: #ef4444;
+  border-radius: 50%;
+  flex-shrink: 0;
+  animation: live-pulse 1.5s ease-in-out infinite;
+}
+
+.live-half-label {
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.live-competition {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-left: auto;
+}
+
+/* Clock */
+.live-clock-wrap {
+  text-align: center;
+  margin-bottom: 12px;
+  padding: 10px 0 4px;
+}
+.live-clock {
+  font-size: 3.2rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -2px;
+  line-height: 1;
+}
+.live-clock-sub {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-top: 5px;
+}
+
+/* Score card */
+.live-score-card {
+  margin-bottom: 10px;
+  padding: 18px 20px;
+}
+.live-score-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.live-team-block {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+.live-team-block-away { flex-direction: row-reverse; }
+.live-team-name {
+  font-size: 1.05rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.live-score-centre {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.live-score-num {
+  font-size: 2.6rem;
+  font-weight: 900;
+  color: var(--accent);
+  background: rgba(34,197,94,.12);
+  min-width: 58px;
+  text-align: center;
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.live-score-sep {
+  font-size: 1.6rem;
+  color: var(--muted);
+  font-weight: 300;
+}
+
+/* Sin bins */
+.live-sinbin-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+}
+.live-sinbin-row:first-of-type { border-top: none; }
+.live-sinbin-team {
+  font-size: 0.875rem;
+  font-weight: 600;
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.live-sinbin-player {
+  font-size: 0.8rem;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.live-sinbin-timer {
+  font-size: 1.05rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #f97316;
+  background: var(--sb-bg);
+  padding: 3px 12px;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+
+/* Distance */
+.live-dist-row {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  margin-bottom: 10px;
+}
+.live-dist-value {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+.live-dist-unit {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--accent);
+}
+.live-dist-label {
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  margin-left: 3px;
+}
+
+/* Incident list */
+.live-inc-list { }
+
+.live-inc-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+}
+.live-inc-row:first-child { border-top: none; }
+
+.live-inc-row-away {
+  flex-direction: row-reverse;
+  text-align: right;
+}
+
+.live-inc-min {
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: #fbbf24;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  min-width: 28px;
+}
+.live-inc-row-away .live-inc-min { text-align: right; }
+
+.live-inc-icon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.live-inc-type {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.live-inc-player {
+  font-size: 0.875rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.live-inc-note {
+  font-size: 0.75rem;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
+}
+
+.live-half-sep {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: var(--muted);
+  text-align: center;
+  padding: 10px 0 4px;
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+}
+
+.live-empty-incidents {
+  font-size: 0.875rem;
+  color: var(--muted);
+  padding: 4px 0;
+}
+
+/* No active match */
+.live-no-match {
+  text-align: center;
+  padding: 72px 20px;
+}
+.live-no-match-icon {
+  font-size: 3.5rem;
+  color: var(--muted);
+  margin-bottom: 16px;
+  animation: live-pulse 2.5s ease-in-out infinite;
+  display: block;
+}
+.live-no-match-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.live-no-match-sub {
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
 /* ── Responsive ── */
 @media (max-width: 480px) {
   .teams-row      { flex-direction: column; gap: 0; }

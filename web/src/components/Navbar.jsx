@@ -18,6 +18,9 @@ export default function Navbar({ onDbInit }) {
           <NavLink to="/" end className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
             Fixtures
           </NavLink>
+          <NavLink to="/live" className={({ isActive }) => 'nav-link nav-link-live' + (isActive ? ' active' : '')}>
+            Live
+          </NavLink>
           <NavLink to="/history" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
             History
           </NavLink>
