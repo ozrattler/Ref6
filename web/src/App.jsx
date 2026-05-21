@@ -8,8 +8,10 @@ import MatchDetail from './pages/MatchDetail'
 import MatchSetup from './pages/MatchSetup'
 import Trends from './pages/Trends'
 import LiveMatch from './pages/LiveMatch'
+import Login from './pages/Login'
 import { pb } from './lib/pb'
 import { checkDb } from './lib/initDb'
+import { AuthProvider, useAuth } from './lib/auth'
 
 const DB_MSGS = {
   missing:     'PocketBase collections not found.',
@@ -28,7 +30,8 @@ function DbBanner({ status }) {
   )
 }
 
-export default function App() {
+function AppInner() {
+  const { isValid } = useAuth()
   const [dbStatus, setDbStatus] = useState(null)
 
   const recheckDb = useCallback(() => {
@@ -36,6 +39,8 @@ export default function App() {
   }, [])
 
   useEffect(() => { recheckDb() }, [recheckDb])
+
+  if (!isValid) return <Login />
 
   return (
     <HashRouter>
@@ -54,5 +59,13 @@ export default function App() {
         </Routes>
       </main>
     </HashRouter>
+  )
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppInner />
+    </AuthProvider>
   )
 }

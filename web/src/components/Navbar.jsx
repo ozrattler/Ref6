@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { initDb } from '../lib/initDb'
+import { useAuth } from '../lib/auth'
 
 export default function Navbar({ onDbInit }) {
   const [showSettings, setShowSettings] = useState(false)
+  const { isAdmin, logout } = useAuth()
 
   function handleSettingsClose() {
     setShowSettings(false)
@@ -27,11 +29,18 @@ export default function Navbar({ onDbInit }) {
           <NavLink to="/trends" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
             Trends
           </NavLink>
-          <NavLink to="/setup" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
-            Set Up
-          </NavLink>
-          <button className="settings-btn" onClick={() => setShowSettings(true)} title="Settings">
-            ⚙
+          {isAdmin && (
+            <NavLink to="/setup" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
+              Set Up
+            </NavLink>
+          )}
+          {isAdmin && (
+            <button className="settings-btn" onClick={() => setShowSettings(true)} title="Settings">
+              ⚙
+            </button>
+          )}
+          <button className="settings-btn" onClick={logout} title="Sign out">
+            ↩
           </button>
         </div>
       </nav>

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { pb } from '../lib/pb'
 import { kitStyle } from '../lib/colours'
+import { useAuth } from '../lib/auth'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -35,6 +36,7 @@ export default function MatchDetail() {
   const [error,     setError]     = useState(null)
   const [tab,       setTab]       = useState('report')  // 'report' | 'timeline'
   const [editing,   setEditing]   = useState(false)
+  const { isAdmin } = useAuth()
   const [form,      setForm]      = useState(null)
   const [saving,    setSaving]    = useState(false)
   const [toast,     setToast]     = useState(null)
@@ -106,7 +108,7 @@ export default function MatchDetail() {
     <div className="page">
       <div className="detail-toolbar">
         <button className="back-btn" onClick={() => navigate(-1)}>← Back</button>
-        {!editing && (
+        {!editing && isAdmin && (
           <button className="btn-edit" onClick={() => setEditing(true)}>Edit</button>
         )}
       </div>

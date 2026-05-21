@@ -2020,6 +2020,40 @@ body {
   color: var(--muted);
 }
 
+/* ── Login page ── */
+.login-page {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 16px;
+}
+.login-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 32px 24px;
+  width: 100%;
+  max-width: 360px;
+}
+.login-logo {
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--accent);
+  letter-spacing: -0.5px;
+  margin-bottom: 4px;
+}
+.login-subtitle {
+  font-size: 0.9rem;
+  color: var(--muted);
+  margin-bottom: 24px;
+}
+.login-error {
+  color: #f87171;
+  font-size: 0.875rem;
+  margin-bottom: 12px;
+}
+
 /* ── Responsive ── */
 @media (max-width: 480px) {
   .teams-row      { flex-direction: column; gap: 0; }

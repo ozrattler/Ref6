@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
+import { Navigate } from 'react-router-dom'
 import { pb } from '../lib/pb'
 import FixtureFormFields from '../components/FixtureFormFields'
 import TemplateManager from '../components/TemplateManager'
+import { useAuth } from '../lib/auth'
 
 const PRESET_TEMPLATES = [
   {
@@ -39,6 +41,7 @@ const DEFAULT_FORM = {
 }
 
 export default function MatchSetup() {
+  const { isAdmin } = useAuth()
   const [form,                setForm]                = useState(DEFAULT_FORM)
   const [saving,              setSaving]              = useState(false)
   const [toast,               setToast]               = useState(null)
@@ -49,7 +52,9 @@ export default function MatchSetup() {
   const [templateName,        setTemplateName]        = useState('')
   const [savingTpl,           setSavingTpl]           = useState(false)
 
-  useEffect(() => { fetchTemplates() }, [])
+  useEffect(() => { if (isAdmin) fetchTemplates() }, [isAdmin])
+
+  if (!isAdmin) return <Navigate to="/" replace />
 
   function fetchTemplates() {
     pb.collection('templates')

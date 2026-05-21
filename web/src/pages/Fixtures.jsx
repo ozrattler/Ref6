@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { pb } from '../lib/pb'
 import { kitStyle } from '../lib/colours'
 import { syncCalendar, getLastSync, formatSyncTime } from '../lib/calendarSync'
+import { useAuth } from '../lib/auth'
 
 const AEST = { timeZone: 'Australia/Sydney' }
 
@@ -62,6 +63,7 @@ export default function Fixtures() {
   const [importModal,   setImportModal]   = useState(null)   // null | parsed state
   const fileInputRef = useRef(null)
   const navigate = useNavigate()
+  const { isAdmin } = useAuth()
 
   const loadFixtures = useCallback(() => {
     pb.collection('match_setups')
@@ -177,38 +179,40 @@ export default function Fixtures() {
     <div className="page">
       <div className="fixtures-header">
         <h1 className="page-title">Fixtures</h1>
-        <div className="sync-bar">
-          {syncMsg && (
-            <span className={`sync-status ${syncMsg.ok ? 'sync-status-ok' : 'sync-status-err'}`}>
-              {syncMsg.text}
-            </span>
-          )}
-          {!syncMsg && lastSync && (
-            <span className="sync-status">Synced {formatSyncTime(lastSync)}</span>
-          )}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".xlsx"
-            style={{ display: 'none' }}
-            onChange={handleFileSelected}
-          />
-          <button
-            className="btn-sync"
-            onClick={() => fileInputRef.current?.click()}
-            title="Import fixtures from an Excel spreadsheet"
-          >
-            Import Excel
-          </button>
-          <button
-            className="btn-sync"
-            onClick={handleSync}
-            disabled={syncing}
-            title="Import fixtures from Google Calendar"
-          >
-            {syncing ? 'Syncing…' : 'Sync Calendar'}
-          </button>
-        </div>
+        {isAdmin && (
+          <div className="sync-bar">
+            {syncMsg && (
+              <span className={`sync-status ${syncMsg.ok ? 'sync-status-ok' : 'sync-status-err'}`}>
+                {syncMsg.text}
+              </span>
+            )}
+            {!syncMsg && lastSync && (
+              <span className="sync-status">Synced {formatSyncTime(lastSync)}</span>
+            )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx"
+              style={{ display: 'none' }}
+              onChange={handleFileSelected}
+            />
+            <button
+              className="btn-sync"
+              onClick={() => fileInputRef.current?.click()}
+              title="Import fixtures from an Excel spreadsheet"
+            >
+              Import Excel
+            </button>
+            <button
+              className="btn-sync"
+              onClick={handleSync}
+              disabled={syncing}
+              title="Import fixtures from Google Calendar"
+            >
+              {syncing ? 'Syncing…' : 'Sync Calendar'}
+            </button>
+          </div>
+        )}
       </div>
 
       {importModal && (
@@ -234,7 +238,7 @@ export default function Fixtures() {
         ))
       )}
 
-      {loadedSetups.length > 0 && (
+      {isAdmin && loadedSetups.length > 0 && (
         <div className="loaded-section">
           <div className="loaded-section-header">Recently Loaded on Watch</div>
           {loadedSetups.map(f => (

@@ -2,8 +2,8 @@
 // All operations use the admin API directly (no PocketBase SDK) so they work
 // regardless of collection-level access rules.
 
-const PUBLIC_RULES = {
-  listRule: '', viewRule: '', createRule: '', updateRule: '', deleteRule: '',
+const COLLECTION_RULES = {
+  listRule: '', viewRule: '', createRule: null, updateRule: null, deleteRule: null,
 }
 
 const f = (name, type, required = false, options = {}) => ({ name, type, required, options })
@@ -143,7 +143,7 @@ async function ensureCollection(pbUrl, token, name, schema) {
     const res = await fetchWithTimeout(`${pbUrl}/api/collections`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ name, type: 'base', schema, ...PUBLIC_RULES }),
+      body: JSON.stringify({ name, type: 'base', schema, ...COLLECTION_RULES }),
     })
     const data = await res.json()
     if (!res.ok) throw new Error(data.message || `Failed to create "${name}"`)
@@ -162,7 +162,7 @@ async function ensureCollection(pbUrl, token, name, schema) {
     headers,
     body: JSON.stringify({
       schema: [...currentSchema, ...missing],
-      ...PUBLIC_RULES,
+      ...COLLECTION_RULES,
     }),
   })
   const data = await res.json()
@@ -205,7 +205,7 @@ export async function initDb(pbUrl, email, password) {
     ? '✓ Created templates collection'
     : `✓ Updated templates (${tRes.added} field${tRes.added !== 1 ? 's' : ''} added)`)
 
-  log.push('✓ All collections have public read/write/delete access')
+  log.push('✓ All collections have public read access, admin-only write/delete')
   return log
 }
 

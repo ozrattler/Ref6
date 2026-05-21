@@ -4,6 +4,7 @@ import { pb } from '../lib/pb'
 import { kitStyle } from '../lib/colours'
 import FixtureFormFields from '../components/FixtureFormFields'
 import { MatchReport } from './MatchDetail'
+import { useAuth } from '../lib/auth'
 
 function toForm(f) {
   return {
@@ -32,6 +33,7 @@ export default function FixtureDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
 
+  const { isAdmin } = useAuth()
   const [fixture,   setFixture]   = useState(null)
   const [match,     setMatch]     = useState(null)   // linked completed match, if any
   const [incidents, setIncidents] = useState([])
@@ -145,7 +147,7 @@ export default function FixtureDetail() {
       <div className="detail-toolbar">
         <button className="back-btn" onClick={() => navigate(-1)}>← Back</button>
         <div className="detail-toolbar-actions">
-          {!editing && (
+          {!editing && isAdmin && (
             <>
               <button className="btn-edit" onClick={() => setEditing(true)}>Edit Fixture</button>
               <button className="btn-delete" onClick={handleDelete} disabled={deleting}>
