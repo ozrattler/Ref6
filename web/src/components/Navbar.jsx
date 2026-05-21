@@ -42,7 +42,7 @@ export default function Navbar({ onDbInit }) {
 }
 
 function SettingsModal({ onClose }) {
-  const [url,          setUrl]          = useState(localStorage.getItem('pb_url')         || 'http://192.168.1.106:8090')
+  const [url,          setUrl]          = useState(localStorage.getItem('pb_url')         || 'https://refappb.duckdns.org')
   const [adminEmail,   setAdminEmail]   = useState(localStorage.getItem('pb_admin_email') || '')
   const [adminPass,    setAdminPass]    = useState(localStorage.getItem('pb_admin_pass')  || '')
   const [initializing, setInitializing] = useState(false)
@@ -90,7 +90,7 @@ function SettingsModal({ onClose }) {
             className="form-input"
             value={url}
             onChange={e => setUrl(e.target.value)}
-            placeholder="http://192.168.1.106:8090"
+            placeholder="https://refappb.duckdns.org"
             spellCheck={false}
             autoComplete="off"
           />
