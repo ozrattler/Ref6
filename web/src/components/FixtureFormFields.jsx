@@ -238,6 +238,9 @@ export default function FixtureFormFields({ form, set }) {
           <div className="form-select-wrap">
             <select className="form-select" value={form.ageGroup}
               onChange={e => onAgeGroupChange(e.target.value)}>
+              {!AGE_GROUPS.some(ag => ag.label === form.ageGroup) && form.ageGroup && (
+                <option value={form.ageGroup}>{form.ageGroup}</option>
+              )}
               {AGE_GROUPS.map(ag => (
                 <option key={ag.label} value={ag.label}>{ag.label}</option>
               ))}
