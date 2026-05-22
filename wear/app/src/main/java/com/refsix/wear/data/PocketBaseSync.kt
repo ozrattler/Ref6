@@ -69,15 +69,16 @@ class PocketBaseSync(private val context: Context) {
         try {
             val filter = URLEncoder.encode("(status='pending')", "UTF-8")
             val url = "$baseUrl/match_setups/records?filter=$filter&sort=-created&perPage=50"
-            Log.d(TAG, "fetchPendingMatchSetups: GET $url")
+            Log.i(TAG, "fetchPendingMatchSetups: GET $url")
             val conn = URL(url).openConnection() as HttpURLConnection
             conn.requestMethod = "GET"
             conn.connectTimeout = 5_000
             conn.readTimeout = 5_000
             val code = conn.responseCode
-            Log.d(TAG, "fetchPendingMatchSetups: HTTP $code")
+            Log.i(TAG, "fetchPendingMatchSetups: HTTP $code")
             if (code !in 200..299) {
-                Log.w(TAG, "fetchPendingMatchSetups: error body=${conn.errorStream?.bufferedReader()?.readText()}")
+                val errBody = conn.errorStream?.bufferedReader()?.readText()
+                Log.e(TAG, "fetchPendingMatchSetups: error HTTP $code body=$errBody")
                 return@withContext emptyList()
             }
             val body = conn.inputStream.bufferedReader().readText()
@@ -123,6 +124,8 @@ class PocketBaseSync(private val context: Context) {
 
     // Returns the PocketBase record ID on success, null on failure.
     suspend fun syncMatch(match: SavedMatch): String? = withContext(Dispatchers.IO) {
+        Log.i(TAG, "syncMatch: START ${match.homeTeam} vs ${match.awayTeam} status=${match.status} setupId=${match.matchSetupId}")
+        Log.i(TAG, "syncMatch: baseUrl=$baseUrl networkAvailable=${isNetworkAvailable()}")
         try {
             val matchBody = JSONObject().apply {
                 put("date", dateFormat.format(Date(match.dateMillis)))
@@ -145,10 +148,10 @@ class PocketBaseSync(private val context: Context) {
                     put("max_heart_rate", match.maxHeartRate)
                 }
             }
-            Log.d(TAG, "syncMatch: posting match ${match.homeTeam} vs ${match.awayTeam}")
+            Log.i(TAG, "syncMatch: POST $baseUrl/matches/records body=$matchBody")
             val pbMatchId = postJson("$baseUrl/matches/records", matchBody)
                 ?: return@withContext null
-            Log.d(TAG, "syncMatch: match created id=$pbMatchId, posting ${match.events.size} events")
+            Log.i(TAG, "syncMatch: match created id=$pbMatchId, posting ${match.events.size} events")
 
             match.events.forEach { event ->
                 val incidentBody = JSONObject().apply {
@@ -174,17 +177,19 @@ class PocketBaseSync(private val context: Context) {
                 patchSetupStatus(setupId, match.status)
             }
 
-            Log.d(TAG, "syncMatch: done id=$pbMatchId")
+            Log.i(TAG, "syncMatch: DONE id=$pbMatchId")
             pbMatchId
         } catch (e: Exception) {
-            Log.e(TAG, "syncMatch: exception", e)
+            Log.e(TAG, "syncMatch: EXCEPTION ${e.javaClass.simpleName}: ${e.message}", e)
             null
         }
     }
 
     private fun patchSetupStatus(id: String, status: String) {
+        val url = "$baseUrl/match_setups/records/$id"
+        Log.i(TAG, "patchSetupStatus: PATCH $url → status=$status")
         try {
-            val conn = URL("$baseUrl/match_setups/records/$id").openConnection() as HttpURLConnection
+            val conn = URL(url).openConnection() as HttpURLConnection
             conn.requestMethod = "PATCH"
             conn.setRequestProperty("Content-Type", "application/json")
             conn.doOutput = true
@@ -194,10 +199,15 @@ class PocketBaseSync(private val context: Context) {
                 it.write(JSONObject().apply { put("status", status) }.toString())
             }
             val code = conn.responseCode
-            Log.d(TAG, "patchSetupStatus($id → $status): HTTP $code")
+            if (code !in 200..299) {
+                val errBody = conn.errorStream?.bufferedReader()?.readText()
+                Log.e(TAG, "patchSetupStatus: HTTP $code body=$errBody")
+            } else {
+                Log.i(TAG, "patchSetupStatus: HTTP $code OK")
+            }
             conn.disconnect()
         } catch (e: Exception) {
-            Log.e(TAG, "patchSetupStatus: exception", e)
+            Log.e(TAG, "patchSetupStatus: EXCEPTION ${e.javaClass.simpleName}: ${e.message}", e)
         }
     }
 
@@ -210,6 +220,7 @@ class PocketBaseSync(private val context: Context) {
     }
 
     private fun postJson(url: String, body: JSONObject): String? {
+        Log.i(TAG, "postJson: POST $url")
         val conn = URL(url).openConnection() as HttpURLConnection
         return try {
             conn.requestMethod = "POST"
@@ -218,8 +229,16 @@ class PocketBaseSync(private val context: Context) {
             conn.connectTimeout = 5_000
             conn.readTimeout = 5_000
             OutputStreamWriter(conn.outputStream).use { it.write(body.toString()) }
-            if (conn.responseCode !in 200..299) return null
-            JSONObject(conn.inputStream.bufferedReader().readText()).getString("id")
+            val code = conn.responseCode
+            if (code !in 200..299) {
+                val errBody = conn.errorStream?.bufferedReader()?.readText()
+                Log.e(TAG, "postJson: HTTP $code url=$url body=$errBody")
+                return null
+            }
+            val responseText = conn.inputStream.bufferedReader().readText()
+            val id = JSONObject(responseText).getString("id")
+            Log.i(TAG, "postJson: HTTP $code created id=$id")
+            id
         } finally {
             conn.disconnect()
         }
