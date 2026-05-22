@@ -2,6 +2,7 @@ package com.refsix.wear
 
 import android.Manifest
 import android.content.Context
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.os.VibrationEffect
@@ -24,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
@@ -31,6 +33,7 @@ import androidx.wear.compose.material.*
 import androidx.wear.compose.navigation.SwipeDismissableNavHost
 import androidx.wear.compose.navigation.composable
 import androidx.wear.compose.navigation.rememberSwipeDismissableNavController
+import com.refsix.wear.data.MatchPhase
 import com.refsix.wear.ui.screens.*
 import com.refsix.wear.ui.theme.Ref6Theme
 import com.refsix.wear.viewmodel.MatchUiEvent
@@ -78,6 +81,18 @@ class MainActivity : ComponentActivity() {
 
                 val navController = rememberSwipeDismissableNavController()
                 val matchViewModel: MatchViewModel = viewModel()
+                val matchState by matchViewModel.state.collectAsState()
+                val context = LocalContext.current
+
+                // Start/stop foreground service so the timer survives backgrounding
+                LaunchedEffect(matchState.phase) {
+                    val svc = Intent(context, MatchTimerService::class.java)
+                    when (matchState.phase) {
+                        MatchPhase.FIRST_HALF -> context.startForegroundService(svc)
+                        MatchPhase.FULL_TIME, MatchPhase.SETUP -> context.stopService(svc)
+                        else -> {}
+                    }
+                }
 
                 // Track current route to disable swipe-to-dismiss on report screens
                 val backStack by navController.currentBackStack.collectAsState()

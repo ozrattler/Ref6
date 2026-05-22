@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { initDb } from '../lib/initDb'
 import { useAuth } from '../lib/auth'
+import { DEFAULT_URL } from '../lib/pb'
 
 export default function Navbar({ onDbInit }) {
   const [showSettings, setShowSettings] = useState(false)
@@ -51,7 +52,7 @@ export default function Navbar({ onDbInit }) {
 }
 
 function SettingsModal({ onClose }) {
-  const [url,          setUrl]          = useState(localStorage.getItem('pb_url')         || 'https://refappb.duckdns.org')
+  const [url,          setUrl]          = useState(localStorage.getItem('pb_url')         || DEFAULT_URL)
   const [adminEmail,   setAdminEmail]   = useState(localStorage.getItem('pb_admin_email') || '')
   const [adminPass,    setAdminPass]    = useState(localStorage.getItem('pb_admin_pass')  || '')
   const [initializing, setInitializing] = useState(false)
@@ -99,12 +100,12 @@ function SettingsModal({ onClose }) {
             className="form-input"
             value={url}
             onChange={e => setUrl(e.target.value)}
-            placeholder="https://refappb.duckdns.org"
+            placeholder={DEFAULT_URL}
             spellCheck={false}
             autoComplete="off"
           />
           <p className="modal-note">
-            GitHub Pages (HTTPS) blocks plain HTTP connections. Serve this app locally or enable HTTPS on PocketBase.
+            Auto-detected from network: LAN (192.168.1.x) uses the local IP, external access uses the HTTPS domain. Override here only if needed.
           </p>
         </div>
 
