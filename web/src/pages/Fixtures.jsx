@@ -379,6 +379,7 @@ function FixtureCard({ fixture: f, onClick }) {
       onKeyDown={e => e.key === 'Enter' && onClick()}>
       <div className="fixture-card-top">
         {f.competition && <span className="fixture-competition">{f.competition}</span>}
+        {f.age_group && <span className="badge">{f.age_group}</span>}
         {cd && <span className={`fixture-countdown ${cd.cls}`}>{cd.label}</span>}
         {f.kickoff_time && <span className="fixture-kotime">{f.kickoff_time}</span>}
       </div>
@@ -398,9 +399,8 @@ function FixtureCard({ fixture: f, onClick }) {
         </div>
       </div>
       <div className="fixture-card-meta">
-        {f.venue    && <span className="fixture-venue">📍 {f.venue}</span>}
-        {f.age_group && <span className="badge">{f.age_group}</span>}
-        {f.referee  && <span className="fixture-official">🟡 {f.referee}</span>}
+        {f.venue   && <span className="fixture-venue">📍 {f.venue}</span>}
+        {f.referee && <span className="fixture-official">🟡 {f.referee}</span>}
       </div>
     </div>
   )
