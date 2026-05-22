@@ -169,9 +169,11 @@ export function parseExcelFixtures(buffer) {
     // Premier League flag based on original league code (before age-group mapping)
     const isPremierLeague = PREMIER_LEAGUE_CODES.has(leagueRaw.toUpperCase().trim())
 
+    // Preserve the exact league code as the displayed grade; only fall back to
+    // a derived label for SRC rows where the league code carries no age info.
     const ageGroup = isLeagueSRC
       ? extractAgeGroupFromText(competition)
-      : (mapped.ageGroup ?? leagueRaw)
+      : (leagueRaw.trim() || '')
 
     const halfLength = isLeagueSRC
       ? halfLengthForAgeGroup(ageGroup)
