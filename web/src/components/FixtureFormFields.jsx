@@ -12,10 +12,9 @@ export const AGE_GROUPS = [
   { label: 'PLM',           halfLength: 45 },
   { label: 'PLR',           halfLength: 45 },
   { label: 'Open / Senior', halfLength: 45 },
-  { label: 'U18',           halfLength: 40 },
-  { label: 'U16',           halfLength: 35 },
-  { label: 'U15',           halfLength: 35 },
-  { label: 'U14',           halfLength: 30 },
+  { label: 'U18',           halfLength: 45 },
+  { label: 'U16/U15',       halfLength: 35 },
+  { label: 'U14/U13',       halfLength: 35 },
   { label: 'U12',           halfLength: 25 },
 ]
 
@@ -27,9 +26,8 @@ function extractAgeGroupFromText(text) {
     const age = parseInt(um[1], 10)
     if (age >= 21) return 'Open / Senior'
     if (age >= 18) return 'U18'
-    if (age >= 16) return 'U16'
-    if (age >= 15) return 'U15'
-    if (age >= 14) return 'U14'
+    if (age >= 15) return 'U16/U15'
+    if (age >= 13) return 'U14/U13'
     return 'U12'
   }
   if (/\bOPEN\b|\bSENIOR\b/.test(u)) return 'Open / Senior'

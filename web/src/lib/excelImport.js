@@ -1,38 +1,46 @@
 import * as XLSX from 'xlsx'
 
-const PLM_PLR = new Set(['PLM', 'PLR', 'SPL', 'SPLR'])
+const PREMIER_LEAGUE_CODES = new Set(['PLM', 'PLR', 'PLW', 'SPL', 'SPLR'])
 const STATE_CUP_RE = /state\s*cup|(?<!\w)src(?!\w)/i
 
-// Map a League column value to a normalised age_group string.
-// Returns null for SRC (caller handles competition field instead).
-function mapLeagueToAgeGroup(league) {
-  const u = league.toUpperCase().trim()
-  if (!u) return ''
-  if (u === 'PLM' || u === 'SPL')  return 'PLM'
-  if (u === 'PLR' || u === 'SPLR') return 'PLR'
-  if (u === 'SRC') return null   // not an age group — caller flags as State Cup
-  if (u.startsWith('AW'))        return 'Open / Senior'
+// Map a League column value → { ageGroup, halfLength }.
+// Returns { ageGroup: null } for SRC (State Cup — caller infers from competition text).
+function mapLeague(raw) {
+  if (!raw) return { ageGroup: '', halfLength: 45 }
+  const u = raw.toUpperCase().trim()
 
-  // U<n> or W<n> — U18D, W18B, etc.
-  const um = u.match(/^[UW](\d+)/)
+  if (u === 'SRC') return { ageGroup: null, halfLength: 45 }
+
+  // Premier League variants and Women's Premier League → Open / Senior
+  if (PREMIER_LEAGUE_CODES.has(u))
+    return { ageGroup: 'Open / Senior', halfLength: 45 }
+
+  // Over-35/45 (O35A, O35B, O45, …), Senior, AW (Women Open)
+  if (/^O\d+/.test(u) || u === 'SENIOR' || u.startsWith('AW'))
+    return { ageGroup: 'Open / Senior', halfLength: 45 }
+
+  // Strip trailing W (Women's variant — same age group and half length)
+  const base = u.endsWith('W') ? u.slice(0, -1) : u
+
+  // U<n> or W<n> (e.g. U16, W16, U14B, U16W stripped to U16)
+  const um = base.match(/^[UW](\d+)/)
   if (um) {
     const age = parseInt(um[1], 10)
-    if (age >= 21) return 'Open / Senior'
-    if (age >= 18) return 'U18'
-    if (age >= 16) return 'U16'
-    if (age >= 15) return 'U15'
-    if (age >= 14) return 'U14'
-    return 'U12'
+    if (age >= 21) return { ageGroup: 'Open / Senior', halfLength: 45 }
+    if (age >= 18) return { ageGroup: 'U18',           halfLength: 45 }
+    if (age >= 15) return { ageGroup: 'U16/U15',       halfLength: 35 }
+    if (age >= 13) return { ageGroup: 'U14/U13',       halfLength: 35 }
+    return               { ageGroup: 'U12',            halfLength: 25 }
   }
 
-  // Anything else containing a number >= 21 (e.g. "21A")
-  const nm = u.match(/(\d+)/)
-  if (nm && parseInt(nm[1], 10) >= 21) return 'Open / Senior'
+  // Bare number >= 21 (e.g. "21A")
+  const nm = base.match(/^(\d+)/)
+  if (nm && parseInt(nm[1], 10) >= 21) return { ageGroup: 'Open / Senior', halfLength: 45 }
 
-  return league  // unrecognised — keep as-is
+  return { ageGroup: raw.trim(), halfLength: 45 }
 }
 
-// Try to infer an age group from a free-text competition name, e.g. "State Cup U14A Boys".
+// Infer age group from free-text competition name, e.g. "State Cup U14A Boys".
 function extractAgeGroupFromText(text) {
   const u = (text || '').toUpperCase()
   const um = u.match(/\bU(\d+)/)
@@ -40,13 +48,20 @@ function extractAgeGroupFromText(text) {
     const age = parseInt(um[1], 10)
     if (age >= 21) return 'Open / Senior'
     if (age >= 18) return 'U18'
-    if (age >= 16) return 'U16'
-    if (age >= 15) return 'U15'
-    if (age >= 14) return 'U14'
+    if (age >= 15) return 'U16/U15'
+    if (age >= 13) return 'U14/U13'
     return 'U12'
   }
   if (/\bOPEN\b|\bSENIOR\b/.test(u)) return 'Open / Senior'
   return ''
+}
+
+function halfLengthForAgeGroup(ag) {
+  if (ag === 'U18')     return 45
+  if (ag === 'U16/U15') return 35
+  if (ag === 'U14/U13') return 35
+  if (ag === 'U12')     return 25
+  return 45
 }
 
 // Convert various date representations to YYYY-MM-DD.
@@ -73,7 +88,7 @@ function parseDate(val) {
   return ''
 }
 
-// Extract HH:MM from a value that may look like "14:00 ~ 15:45" or just "14:00".
+// Extract HH:MM from "14:00 ~ 15:45" or "14:00".
 function parseTime(val) {
   if (!val) return ''
   const before = String(val).split('~')[0].trim()
@@ -92,10 +107,13 @@ function findHeaderRow(rows) {
   return 0
 }
 
-// Return column index for a header name (case-insensitive).
-function colIdx(headers, name) {
-  const idx = headers.findIndex(h => str(h).toLowerCase() === name.toLowerCase())
-  return idx >= 0 ? idx : null
+// Return column index for the first matching header name (case-insensitive).
+function colIdx(headers, ...names) {
+  for (const name of names) {
+    const idx = headers.findIndex(h => str(h).toLowerCase() === name.toLowerCase())
+    if (idx >= 0) return idx
+  }
+  return null
 }
 
 function get(row, idx) { return idx !== null ? str(row[idx]) : '' }
@@ -116,8 +134,8 @@ export function parseExcelFixtures(buffer) {
     competition: colIdx(headers, 'Competition'),
     league:      colIdx(headers, 'League'),
     venue:       colIdx(headers, 'Venue'),
-    homeClub:    colIdx(headers, 'Home club'),
-    awayClub:    colIdx(headers, 'Away club'),
+    homeClub:    colIdx(headers, 'Home team', 'Home club', 'Home'),
+    awayClub:    colIdx(headers, 'Away team', 'Away club', 'Away'),
     referee:     colIdx(headers, 'R'),
     ar1:         colIdx(headers, 'A1'),
     ar2:         colIdx(headers, 'A2'),
@@ -142,15 +160,22 @@ export function parseExcelFixtures(buffer) {
     const awayTeam = get(row, C.awayClub)
     if (!homeTeam && !awayTeam) { skipped++; continue }
 
-    const competition   = get(row, C.competition)
-    const leagueRaw     = get(row, C.league)
-    const mappedAge     = mapLeagueToAgeGroup(leagueRaw)
-    const isLeagueSRC   = mappedAge === null                        // SRC returns null
-    const isStateCup    = isLeagueSRC || STATE_CUP_RE.test(competition)
-    const ageGroup      = isLeagueSRC
-      ? extractAgeGroupFromText(competition)   // infer from competition name
-      : (mappedAge ?? leagueRaw)               // use mapped value or original
-    const isPremierLeague = PLM_PLR.has((ageGroup || '').toUpperCase())
+    const competition  = get(row, C.competition)
+    const leagueRaw    = get(row, C.league)
+    const mapped       = mapLeague(leagueRaw)
+    const isLeagueSRC  = mapped.ageGroup === null
+    const isStateCup   = isLeagueSRC || STATE_CUP_RE.test(competition)
+
+    // Premier League flag based on original league code (before age-group mapping)
+    const isPremierLeague = PREMIER_LEAGUE_CODES.has(leagueRaw.toUpperCase().trim())
+
+    const ageGroup = isLeagueSRC
+      ? extractAgeGroupFromText(competition)
+      : (mapped.ageGroup ?? leagueRaw)
+
+    const halfLength = isLeagueSRC
+      ? halfLengthForAgeGroup(ageGroup)
+      : mapped.halfLength
 
     fixtures.push({
       kickoff_date:        parseDate(get(row, C.date)),
@@ -164,8 +189,7 @@ export function parseExcelFixtures(buffer) {
       ar1:                 get(row, C.ar1),
       ar2:                 get(row, C.ar2),
       fourth_official:     get(row, C.fourth),
-      // rule defaults — State Cup overrides sin bin and penalties
-      half_length:         45,
+      half_length:         halfLength,
       two_yellows_rule:    'red_card',
       dissent_sin_bin:     !isStateCup,
       record_goal_scorers: isPremierLeague || isStateCup,
