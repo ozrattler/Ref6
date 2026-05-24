@@ -134,8 +134,6 @@ export function parseExcelFixtures(buffer) {
     competition: colIdx(headers, 'Competition'),
     league:      colIdx(headers, 'League'),
     venue:       colIdx(headers, 'Venue'),
-    homeClub:    colIdx(headers, 'Home team', 'Home club', 'Home'),
-    awayClub:    colIdx(headers, 'Away team', 'Away club', 'Away'),
     referee:     colIdx(headers, 'R'),
     ar1:         colIdx(headers, 'A1'),
     ar2:         colIdx(headers, 'A2'),
@@ -156,8 +154,8 @@ export function parseExcelFixtures(buffer) {
     const rowStatus = get(row, C.status).toUpperCase()
     if (rowStatus === 'PLAYED') { skipped++; continue }
 
-    const homeTeam = get(row, C.homeClub)
-    const awayTeam = get(row, C.awayClub)
+    const homeTeam = [str(row[8]), str(row[9])].filter(Boolean).join(' ').slice(0, 4)
+    const awayTeam = [str(row[10]), str(row[11])].filter(Boolean).join(' ').slice(0, 4)
     if (!homeTeam && !awayTeam) { skipped++; continue }
 
     const competition  = get(row, C.competition)
