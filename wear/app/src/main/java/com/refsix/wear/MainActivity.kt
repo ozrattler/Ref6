@@ -131,7 +131,8 @@ class MainActivity : ComponentActivity() {
                                         -1
                                     )
                                 )
-                                navController.navigate("confirmEnd/fullTime") {
+                                matchViewModel.callFullTime()
+                                navController.navigate("fullTime") {
                                     popUpTo("match") { inclusive = false }
                                 }
                             }
@@ -174,6 +175,14 @@ class MainActivity : ComponentActivity() {
                             },
                             onShowSetupList = {
                                 navController.navigate("setupList")
+                            },
+                            onResumeMatch = {
+                                matchViewModel.resumeMatch()
+                                val phase = matchViewModel.state.value.phase
+                                val dest = if (phase == MatchPhase.HALF_TIME) "halfTime" else "match"
+                                navController.navigate(dest) {
+                                    popUpTo("setup") { inclusive = false }
+                                }
                             }
                         )
                     }
@@ -312,6 +321,19 @@ class MainActivity : ComponentActivity() {
                             index = index,
                             onDone = { navController.popBackStack() }
                         )
+                    }
+                }
+
+                // On first launch, auto-resume any in-progress match before the user sees setup.
+                val hasResumeOnStart = remember { matchViewModel.hasResumableMatch.value }
+                LaunchedEffect(Unit) {
+                    if (hasResumeOnStart) {
+                        matchViewModel.resumeMatch()
+                        val phase = matchViewModel.state.value.phase
+                        val dest = if (phase == MatchPhase.HALF_TIME) "halfTime" else "match"
+                        navController.navigate(dest) {
+                            popUpTo("setup") { inclusive = false }
+                        }
                     }
                 }
 

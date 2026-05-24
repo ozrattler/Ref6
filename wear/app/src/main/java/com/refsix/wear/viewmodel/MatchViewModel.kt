@@ -78,6 +78,9 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
     private val _savedMatches = MutableStateFlow(matchStorage.loadMatches())
     val savedMatches: StateFlow<List<SavedMatch>> = _savedMatches.asStateFlow()
 
+    private val _hasResumableMatch = MutableStateFlow(matchStorage.hasInProgressState())
+    val hasResumableMatch: StateFlow<Boolean> = _hasResumableMatch.asStateFlow()
+
     private val _pendingSetups = MutableStateFlow<List<MatchSetupData>>(emptyList())
     val pendingSetups: StateFlow<List<MatchSetupData>> = _pendingSetups.asStateFlow()
 
@@ -102,9 +105,17 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
         observeRunningForDnd()
     }
 
+    private fun saveInProgress(htBreakStartMillis: Long = 0L) {
+        val s = _state.value
+        if (s.phase == MatchPhase.SETUP || s.phase == MatchPhase.FULL_TIME) return
+        matchStorage.saveInProgressState(s, htBreakStartMillis)
+        _hasResumableMatch.value = true
+    }
+
     private fun launchTimer() {
         timerJob?.cancel()
         timerJob = viewModelScope.launch {
+            var saveTickCount = 0
             while (isActive) {
                 delay(1000L)
                 var justExpired = emptyList<SinBinEntry>()
@@ -133,6 +144,16 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
                         totalElapsedSeconds = newTotal,
                         sinBins = s.sinBins.filterNot { it.isExpired(newTotal) }
                     )
+                }
+                if (_state.value.isRunning) {
+                    saveTickCount++
+                    if (saveTickCount >= 10) {
+                        saveTickCount = 0
+                        saveInProgress()
+                    }
+                }
+                if (justExpired.isNotEmpty()) {
+                    saveInProgress()
                 }
                 justExpired.forEach { bin ->
                     _uiEvents.tryEmit(MatchUiEvent.SinBinExpired(bin.team, bin.playerNumber))
@@ -302,6 +323,8 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun startMatch() {
+        matchStorage.clearInProgressState()
+        _hasResumableMatch.value = false
         _state.update {
             it.copy(
                 phase = MatchPhase.FIRST_HALF,
@@ -330,11 +353,14 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
 
     fun toggleTimer() {
         _state.update { it.copy(isRunning = !it.isRunning) }
+        saveInProgress()
     }
 
     fun callHalfTime() {
         _state.update { it.copy(phase = MatchPhase.HALF_TIME, isRunning = false) }
+        val htStartMillis = System.currentTimeMillis()
         startHalfTimeCountdown()
+        saveInProgress(htBreakStartMillis = htStartMillis)
     }
 
     fun ensureHalfTimeCountdown() {
@@ -343,10 +369,10 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
         if (_state.value.phase == MatchPhase.HALF_TIME) startHalfTimeCountdown()
     }
 
-    private fun startHalfTimeCountdown() {
+    private fun startHalfTimeCountdown(fromSeconds: Int = 300) {
         halfTimeCountdownJob?.cancel()
         halfTimeCountdownJob = viewModelScope.launch {
-            var remaining = 300
+            var remaining = fromSeconds
             _halfTimeCountdown.value = remaining
             while (remaining > 0 && isActive) {
                 delay(1000L)
@@ -356,6 +382,17 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
             if (isActive) {
                 _uiEvents.tryEmit(MatchUiEvent.HalfTimeCountdownExpired)
             }
+        }
+    }
+
+    fun resumeMatch() {
+        val (savedState, htBreakStartMillis) = matchStorage.loadInProgressState() ?: return
+        _state.value = savedState
+        if (savedState.phase == MatchPhase.HALF_TIME) {
+            val elapsedSec = if (htBreakStartMillis > 0)
+                ((System.currentTimeMillis() - htBreakStartMillis) / 1000L).toInt()
+            else Int.MAX_VALUE
+            startHalfTimeCountdown(maxOf(0, 300 - elapsedSec))
         }
     }
 
@@ -370,10 +407,13 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
                 isRunning = true
             )
         }
+        saveInProgress()
     }
 
     fun callFullTime() {
         _state.update { it.copy(phase = MatchPhase.FULL_TIME, isRunning = false) }
+        matchStorage.clearInProgressState()
+        _hasResumableMatch.value = false
         matchStorage.saveMatch(_state.value)
         _savedMatches.value = matchStorage.loadMatches()
         viewModelScope.launch {
@@ -453,6 +493,7 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
                 events = s.events + event
             )
         }
+        saveInProgress()
     }
 
     fun recordCard(team: String, playerNumber: String, cardType: CardType, offence: String) {
@@ -544,6 +585,7 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
 
             s.copy(events = newEvents, sinBins = updatedSinBins, cardAlert = alert)
         }
+        saveInProgress()
     }
 
     fun dismissCardAlert() {
@@ -552,6 +594,7 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
 
     fun returnFromSinBin(sinBinId: Long) {
         _state.update { s -> s.copy(sinBins = s.sinBins.filter { it.id != sinBinId }) }
+        saveInProgress()
     }
 
     fun clearHistory() {
@@ -563,5 +606,7 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
         halfTimeCountdownJob?.cancel()
         _halfTimeCountdown.value = 0
         _state.value = MatchState()
+        matchStorage.clearInProgressState()
+        _hasResumableMatch.value = false
     }
 }

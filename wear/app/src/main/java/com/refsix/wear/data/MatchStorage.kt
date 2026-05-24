@@ -6,6 +6,159 @@ import org.json.JSONObject
 
 class MatchStorage(context: Context) {
     private val prefs = context.getSharedPreferences("ref6_history", Context.MODE_PRIVATE)
+    private val progressPrefs = context.getSharedPreferences("ref6_in_progress", Context.MODE_PRIVATE)
+
+    fun hasInProgressState(): Boolean = progressPrefs.contains("state")
+
+    fun saveInProgressState(state: MatchState, htBreakStartMillis: Long = 0L) {
+        // commit() is synchronous — the write completes before we return, so a
+        // forced app kill immediately after cannot discard the saved state.
+        progressPrefs.edit().putString("state", serializeMatchState(state, htBreakStartMillis)).commit()
+    }
+
+    fun loadInProgressState(): Pair<MatchState, Long>? {
+        val json = progressPrefs.getString("state", null) ?: return null
+        return runCatching { deserializeMatchState(json) }.getOrNull()
+    }
+
+    fun clearInProgressState() {
+        progressPrefs.edit().clear().commit()
+    }
+
+    private fun serializeMatchState(state: MatchState, htBreakStartMillis: Long): String {
+        return JSONObject().apply {
+            put("htBreakStartMillis", htBreakStartMillis)
+            put("homeTeam", state.homeTeam)
+            put("awayTeam", state.awayTeam)
+            put("kickOffTeam", state.kickOffTeam)
+            put("halfLengthMinutes", state.halfLengthMinutes)
+            put("ageGroup", state.ageGroup.name)
+            put("competitionType", state.competitionType.name)
+            put("gradeCode", state.gradeCode)
+            put("competitionName", state.competitionName)
+            put("sinBinMinutes", state.sinBinMinutes)
+            put("homeScore", state.homeScore)
+            put("awayScore", state.awayScore)
+            put("currentHalf", state.currentHalf)
+            put("halfElapsedSeconds", state.halfElapsedSeconds)
+            put("totalElapsedSeconds", state.totalElapsedSeconds)
+            put("phase", state.phase.name)
+            put("matchSetupId", state.matchSetupId ?: "")
+            put("kickoffDate", state.kickoffDate)
+            put("kickoffTime", state.kickoffTime)
+            put("totalDistanceMeters", state.totalDistanceMeters.toDouble())
+            put("maxSpeedMs", state.maxSpeedMs.toDouble())
+            put("validSpeedCount", state.validSpeedCount)
+            put("totalValidSpeedSum", state.totalValidSpeedSum.toDouble())
+            put("avgHeartRate", state.avgHeartRate)
+            put("maxHeartRate", state.maxHeartRate)
+            put("heartRateReadings", JSONArray().also { arr ->
+                state.heartRateReadings.forEach { arr.put(it) }
+            })
+            put("events", JSONArray().also { arr ->
+                state.events.forEach { ev ->
+                    arr.put(JSONObject().apply {
+                        put("id", ev.id)
+                        put("type", ev.type.name)
+                        put("team", ev.team)
+                        put("playerNumber", ev.playerNumber)
+                        put("detail", ev.detail)
+                        put("matchMinute", ev.matchMinute)
+                        put("half", ev.half)
+                        put("scorerNumber", ev.scorerNumber)
+                        put("scorerName", ev.scorerName)
+                        if (ev.lat != null) put("lat", ev.lat)
+                        if (ev.lng != null) put("lng", ev.lng)
+                    })
+                }
+            })
+            put("sinBins", JSONArray().also { arr ->
+                state.sinBins.forEach { bin ->
+                    arr.put(JSONObject().apply {
+                        put("id", bin.id)
+                        put("team", bin.team)
+                        put("playerNumber", bin.playerNumber)
+                        put("offence", bin.offence)
+                        put("startElapsedSeconds", bin.startElapsedSeconds)
+                        put("durationSeconds", bin.durationSeconds)
+                    })
+                }
+            })
+            // GPS points are excluded to keep payload small for fast synchronous commit().
+            // Aggregate distance/speed stats above are preserved so the final match record is correct.
+        }.toString()
+    }
+
+    private fun deserializeMatchState(json: String): Pair<MatchState, Long> {
+        val obj = JSONObject(json)
+        val htBreakStartMillis = obj.optLong("htBreakStartMillis", 0L)
+
+        val eventsArr = obj.getJSONArray("events")
+        val events = (0 until eventsArr.length()).map { i ->
+            val e = eventsArr.getJSONObject(i)
+            MatchEvent(
+                id = e.getLong("id"),
+                type = EventType.valueOf(e.getString("type")),
+                team = e.getString("team"),
+                playerNumber = e.getString("playerNumber"),
+                detail = e.getString("detail"),
+                matchMinute = e.getInt("matchMinute"),
+                half = e.getInt("half"),
+                scorerNumber = e.getString("scorerNumber"),
+                scorerName = e.getString("scorerName"),
+                lat = if (e.has("lat")) e.getDouble("lat") else null,
+                lng = if (e.has("lng")) e.getDouble("lng") else null
+            )
+        }
+
+        val sinBinsArr = obj.getJSONArray("sinBins")
+        val sinBins = (0 until sinBinsArr.length()).map { i ->
+            val b = sinBinsArr.getJSONObject(i)
+            SinBinEntry(
+                id = b.getLong("id"),
+                team = b.getString("team"),
+                playerNumber = b.getString("playerNumber"),
+                offence = b.getString("offence"),
+                startElapsedSeconds = b.getLong("startElapsedSeconds"),
+                durationSeconds = b.getLong("durationSeconds")
+            )
+        }
+
+        val hrArr = obj.getJSONArray("heartRateReadings")
+        val heartRateReadings = (0 until hrArr.length()).map { i -> hrArr.getInt(i) }
+
+        val state = MatchState(
+            homeTeam = obj.getString("homeTeam"),
+            awayTeam = obj.getString("awayTeam"),
+            kickOffTeam = obj.getString("kickOffTeam"),
+            halfLengthMinutes = obj.getInt("halfLengthMinutes"),
+            ageGroup = AgeGroup.valueOf(obj.getString("ageGroup")),
+            competitionType = CompetitionType.valueOf(obj.getString("competitionType")),
+            gradeCode = obj.getString("gradeCode"),
+            competitionName = obj.getString("competitionName"),
+            sinBinMinutes = obj.getInt("sinBinMinutes"),
+            homeScore = obj.getInt("homeScore"),
+            awayScore = obj.getInt("awayScore"),
+            currentHalf = obj.getInt("currentHalf"),
+            isRunning = false,
+            halfElapsedSeconds = obj.getLong("halfElapsedSeconds"),
+            totalElapsedSeconds = obj.getLong("totalElapsedSeconds"),
+            phase = MatchPhase.valueOf(obj.getString("phase")),
+            matchSetupId = obj.getString("matchSetupId").ifEmpty { null },
+            kickoffDate = obj.getString("kickoffDate"),
+            kickoffTime = obj.getString("kickoffTime"),
+            totalDistanceMeters = obj.getDouble("totalDistanceMeters").toFloat(),
+            maxSpeedMs = obj.getDouble("maxSpeedMs").toFloat(),
+            validSpeedCount = obj.getInt("validSpeedCount"),
+            totalValidSpeedSum = obj.getDouble("totalValidSpeedSum").toFloat(),
+            avgHeartRate = obj.getInt("avgHeartRate"),
+            maxHeartRate = obj.getInt("maxHeartRate"),
+            heartRateReadings = heartRateReadings,
+            events = events,
+            sinBins = sinBins
+        )
+        return Pair(state, htBreakStartMillis)
+    }
 
     fun saveMatch(state: MatchState, status: String = "completed") {
         val match = SavedMatch(

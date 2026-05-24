@@ -24,10 +24,12 @@ fun SetupScreen(
     viewModel: MatchViewModel,
     onStartMatch: () -> Unit,
     onShowHistory: () -> Unit = {},
-    onShowSetupList: () -> Unit = {}
+    onShowSetupList: () -> Unit = {},
+    onResumeMatch: () -> Unit = {}
 ) {
     val state by viewModel.state.collectAsState()
     val appliedSetup by viewModel.appliedSetup.collectAsState()
+    val hasResumableMatch by viewModel.hasResumableMatch.collectAsState()
 
     var homeTeam by remember { mutableStateOf(state.homeTeam) }
     var awayTeam by remember { mutableStateOf(state.awayTeam) }
@@ -73,6 +75,23 @@ fun SetupScreen(
                 colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF1B4D1B)),
                 modifier = Modifier.fillMaxWidth()
             )
+        }
+
+        if (hasResumableMatch) {
+            item {
+                Chip(
+                    label = {
+                        Text(
+                            text = "RESUME MATCH",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp
+                        )
+                    },
+                    onClick = onResumeMatch,
+                    colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF4A2800)),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         }
 
         item {
