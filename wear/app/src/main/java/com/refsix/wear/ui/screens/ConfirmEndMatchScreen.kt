@@ -29,8 +29,10 @@ fun ConfirmEndMatchScreen(
             delay(1000L)
             countdown--
         }
-        // Countdown expired without confirmation — return to match, nothing changed
-        navController.popBackStack()
+        // Countdown expired — return to match unconditionally, nothing changed
+        navController.navigate("match") {
+            popUpTo("setup") { inclusive = false }
+        }
     }
 
     val isFullTime = action == "fullTime"
@@ -89,7 +91,11 @@ fun ConfirmEndMatchScreen(
 
             CompactChip(
                 label = { Text("Cancel", fontWeight = FontWeight.Bold) },
-                onClick = { navController.popBackStack() },
+                onClick = {
+                    navController.navigate("match") {
+                        popUpTo("setup") { inclusive = false }
+                    }
+                },
                 colors = ChipDefaults.chipColors(backgroundColor = RefBlue)
             )
         }

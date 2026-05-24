@@ -29,7 +29,9 @@ data class MatchSetupData(
     val competition: String,
     val gradeCode: String = "",  // raw age_group string from PocketBase (e.g. "O45D", "PLM")
     val kickoffDate: String = "",
-    val kickoffTime: String = ""
+    val kickoffTime: String = "",
+    val homeColour: String = "",  // hex e.g. "#FF0000"
+    val awayColour: String = ""
 )
 
 class PocketBaseSync(private val context: Context) {
@@ -115,7 +117,9 @@ class PocketBaseSync(private val context: Context) {
                     competition = competition,
                     gradeCode = ageGroupStr,
                     kickoffDate = item.optString("kickoff_date", ""),
-                    kickoffTime = item.optString("kickoff_time", "")
+                    kickoffTime = item.optString("kickoff_time", ""),
+                    homeColour = item.optString("home_colour", ""),
+                    awayColour = item.optString("away_colour", "")
                 )
             }
         } catch (e: Exception) {

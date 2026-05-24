@@ -69,6 +69,8 @@ data class MatchState(
     val competitionType: CompetitionType = CompetitionType.STANDARD,
     val gradeCode: String = "",       // original age_group string from fixture (e.g. "O45D", "PLM")
     val competitionName: String = "", // original competition string from fixture (e.g. "2026 Winter")
+    val homeColour: String = "",      // kit colour hex from PocketBase (e.g. "#FF0000"), empty = no dot
+    val awayColour: String = "",
     val sinBinMinutes: Int = 10,
     val homeScore: Int = 0,
     val awayScore: Int = 0,

@@ -2,6 +2,7 @@
 
 package com.refsix.wear.ui.screens
 
+import android.graphics.Color as AndroidColor
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -168,12 +169,30 @@ private fun MainMatchPage(
                 color = Color.Gray
             )
 
-            Text(
-                text = "%02d:%02d".format(state.displayMinutes, state.displaySeconds),
-                fontSize = 30.sp,
-                fontWeight = FontWeight.Bold,
-                color = if (state.isRunning) Color.White else Color.Gray
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = "%02d:%02d".format(state.displayMinutes, state.displaySeconds),
+                    fontSize = 30.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (state.isRunning) Color.White else Color.Gray
+                )
+                if (!state.isInAdditionalTime) {
+                    val remaining = state.halfRemainingSeconds
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "-%02d:%02d".format(remaining / 60, remaining % 60),
+                        fontSize = 16.sp,
+                        color = when {
+                            remaining <= 60 -> RefRed
+                            remaining <= 120 -> RefYellow
+                            else -> Color.Gray
+                        }
+                    )
+                }
+            }
 
             if (state.isInAdditionalTime) {
                 Text(
@@ -194,51 +213,13 @@ private fun MainMatchPage(
                 color = Color.White
             )
 
-            // Team names + GPS dot + distance on one row to keep layout compact
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = state.homeTeam.take(4),
-                    style = MaterialTheme.typography.caption2,
-                    color = Color.Gray,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(6.dp)
-                            .clip(CircleShape)
-                            .background(if (state.hasGpsFix) Color(0xFF22C55E) else Color(0xFF444444))
-                    )
-                    Spacer(modifier = Modifier.width(3.dp))
-                    Text(
-                        text = "%.2fkm".format(state.totalDistanceKm),
-                        fontSize = 9.sp,
-                        color = Color.Gray
-                    )
-                    if (state.currentHeartRate > 0) {
-                        Spacer(modifier = Modifier.width(5.dp))
-                        Text(
-                            text = "♥${state.currentHeartRate}",
-                            fontSize = 9.sp,
-                            color = Color(0xFFE53935)
-                        )
-                    }
-                }
-                Text(
-                    text = state.awayTeam.take(4),
-                    style = MaterialTheme.typography.caption2,
-                    color = Color.Gray,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                KitTeamLabel(state.homeTeam.take(4), state.homeColour)
+                KitTeamLabel(state.awayTeam.take(4), state.awayColour)
             }
 
             // Sin bins: home on left, away on right — tap to manage
@@ -381,4 +362,34 @@ private fun TeamActionPage(
             }
         }
     }
+}
+
+@Composable
+private fun KitTeamLabel(name: String, hexColour: String) {
+    val kitColor = hexColour.toKitColor()
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        if (kitColor != null) {
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(kitColor)
+            )
+        }
+        Text(
+            text = name,
+            fontSize = 14.sp,
+            color = Color.Gray,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+private fun String.toKitColor(): Color? {
+    if (isEmpty()) return null
+    return runCatching { Color(AndroidColor.parseColor(this)) }.getOrNull()
 }

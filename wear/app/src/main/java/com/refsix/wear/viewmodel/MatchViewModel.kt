@@ -459,7 +459,9 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
                 sinBinMinutes = setup.sinBinMinutes,
                 matchSetupId = setup.id,
                 kickoffDate = setup.kickoffDate,
-                kickoffTime = setup.kickoffTime
+                kickoffTime = setup.kickoffTime,
+                homeColour = setup.homeColour,
+                awayColour = setup.awayColour
             )
         }
     }

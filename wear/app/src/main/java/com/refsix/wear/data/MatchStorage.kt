@@ -36,6 +36,8 @@ class MatchStorage(context: Context) {
             put("competitionType", state.competitionType.name)
             put("gradeCode", state.gradeCode)
             put("competitionName", state.competitionName)
+            put("homeColour", state.homeColour)
+            put("awayColour", state.awayColour)
             put("sinBinMinutes", state.sinBinMinutes)
             put("homeScore", state.homeScore)
             put("awayScore", state.awayScore)
@@ -136,6 +138,8 @@ class MatchStorage(context: Context) {
             competitionType = CompetitionType.valueOf(obj.getString("competitionType")),
             gradeCode = obj.getString("gradeCode"),
             competitionName = obj.getString("competitionName"),
+            homeColour = obj.optString("homeColour", ""),
+            awayColour = obj.optString("awayColour", ""),
             sinBinMinutes = obj.getInt("sinBinMinutes"),
             homeScore = obj.getInt("homeScore"),
             awayScore = obj.getInt("awayScore"),
