@@ -67,6 +67,8 @@ data class MatchState(
     val halfLengthMinutes: Int = 45,
     val ageGroup: AgeGroup = AgeGroup.OPEN_SENIOR,
     val competitionType: CompetitionType = CompetitionType.STANDARD,
+    val gradeCode: String = "",       // original age_group string from fixture (e.g. "O45D", "PLM")
+    val competitionName: String = "", // original competition string from fixture (e.g. "2026 Winter")
     val sinBinMinutes: Int = 10,
     val homeScore: Int = 0,
     val awayScore: Int = 0,

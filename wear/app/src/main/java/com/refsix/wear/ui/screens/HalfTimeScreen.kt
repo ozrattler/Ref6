@@ -55,8 +55,8 @@ fun HalfTimeScreen(viewModel: MatchViewModel, onStopHalfTimeBreak: () -> Unit) {
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text(state.homeTeam, style = MaterialTheme.typography.caption1, color = Color.Gray)
-                Text(state.awayTeam, style = MaterialTheme.typography.caption1, color = Color.Gray)
+                Text(state.homeTeam.take(4), style = MaterialTheme.typography.caption1, color = Color.Gray)
+                Text(state.awayTeam.take(4), style = MaterialTheme.typography.caption1, color = Color.Gray)
             }
         }
 

@@ -45,6 +45,7 @@ sealed class MatchUiEvent {
     data class SinBinExpired(val team: String, val playerNumber: String) : MatchUiEvent()
     object HalfTimeAlert : MatchUiEvent()
     object FullTimeAlert : MatchUiEvent()
+    object FullTimeAutoReached : MatchUiEvent()
     object HalfTimeCountdownExpired : MatchUiEvent()
 }
 
@@ -107,7 +108,8 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
             while (isActive) {
                 delay(1000L)
                 var justExpired = emptyList<SinBinEntry>()
-                var justReachedHalfEnd = false
+                var halfTimeAutoTrigger = false
+                var fullTimeAutoTrigger = false
                 _state.update { s ->
                     if (!s.isRunning) return@update s
                     val newHalf = s.halfElapsedSeconds + 1L
@@ -115,10 +117,17 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
                     justExpired = s.sinBins.filter {
                         !it.isExpired(s.totalElapsedSeconds) && it.isExpired(newTotal)
                     }
-                    justReachedHalfEnd =
+                    val justReachedHalfEnd =
                         (s.phase == MatchPhase.FIRST_HALF || s.phase == MatchPhase.SECOND_HALF) &&
                         s.halfElapsedSeconds < s.halfLengthSeconds &&
                         newHalf >= s.halfLengthSeconds
+                    if (justReachedHalfEnd) {
+                        when (s.phase) {
+                            MatchPhase.FIRST_HALF  -> halfTimeAutoTrigger = true
+                            MatchPhase.SECOND_HALF -> fullTimeAutoTrigger = true
+                            else -> {}
+                        }
+                    }
                     s.copy(
                         halfElapsedSeconds = newHalf,
                         totalElapsedSeconds = newTotal,
@@ -128,8 +137,12 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
                 justExpired.forEach { bin ->
                     _uiEvents.tryEmit(MatchUiEvent.SinBinExpired(bin.team, bin.playerNumber))
                 }
-                if (justReachedHalfEnd) {
+                if (halfTimeAutoTrigger) {
+                    callHalfTime()
                     _uiEvents.tryEmit(MatchUiEvent.HalfTimeAlert)
+                }
+                if (fullTimeAutoTrigger) {
+                    _uiEvents.tryEmit(MatchUiEvent.FullTimeAutoReached)
                 }
             }
         }
@@ -401,6 +414,8 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
                 ageGroup = setup.ageGroup,
                 halfLengthMinutes = setup.halfLengthMinutes,
                 competitionType = setup.competitionType,
+                gradeCode = setup.gradeCode,
+                competitionName = setup.competition,
                 sinBinMinutes = setup.sinBinMinutes,
                 matchSetupId = setup.id,
                 kickoffDate = setup.kickoffDate,

@@ -201,7 +201,7 @@ private fun MainMatchPage(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = state.homeTeam.take(6),
+                    text = state.homeTeam.take(4),
                     style = MaterialTheme.typography.caption2,
                     color = Color.Gray,
                     maxLines = 1,
@@ -233,7 +233,7 @@ private fun MainMatchPage(
                     }
                 }
                 Text(
-                    text = state.awayTeam.take(6),
+                    text = state.awayTeam.take(4),
                     style = MaterialTheme.typography.caption2,
                     color = Color.Gray,
                     maxLines = 1,
@@ -288,36 +288,16 @@ private fun MainMatchPage(
 
             Spacer(modifier = Modifier.height(2.dp))
 
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                CompactChip(
-                    label = {
-                        Text(
-                            text = if (state.isRunning) "PAUSE" else "START",
-                            fontWeight = FontWeight.Bold
-                        )
-                    },
-                    onClick = { viewModel.toggleTimer() },
-                    colors = ChipDefaults.chipColors(backgroundColor = RefBlue)
-                )
-                CompactChip(
-                    label = {
-                        Text(
-                            text = if (state.currentHalf == 1) "H/T" else "F/T",
-                            fontWeight = FontWeight.Bold
-                        )
-                    },
-                    onClick = {
-                        if (state.currentHalf == 1) {
-                            viewModel.callHalfTime()
-                            navController.navigate("halfTime")
-                        } else {
-                            viewModel.callFullTime()
-                            navController.navigate("fullTime")
-                        }
-                    },
-                    colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF9C27B0))
-                )
-            }
+            CompactChip(
+                label = {
+                    Text(
+                        text = if (state.isRunning) "PAUSE" else "START",
+                        fontWeight = FontWeight.Bold
+                    )
+                },
+                onClick = { viewModel.toggleTimer() },
+                colors = ChipDefaults.chipColors(backgroundColor = RefBlue)
+            )
 
         }
     }
@@ -352,7 +332,7 @@ private fun TeamActionPage(
             modifier = Modifier.padding(horizontal = 16.dp)
         ) {
             Text(
-                text = team.uppercase(),
+                text = team.take(4).uppercase(),
                 style = MaterialTheme.typography.title2,
                 fontWeight = FontWeight.Bold,
                 color = Color.White,

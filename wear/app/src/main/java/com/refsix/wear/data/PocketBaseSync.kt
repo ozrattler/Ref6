@@ -27,6 +27,7 @@ data class MatchSetupData(
     val competitionType: CompetitionType,
     val sinBinMinutes: Int,
     val competition: String,
+    val gradeCode: String = "",  // raw age_group string from PocketBase (e.g. "O45D", "PLM")
     val kickoffDate: String = "",
     val kickoffTime: String = ""
 )
@@ -112,6 +113,7 @@ class PocketBaseSync(private val context: Context) {
                     competitionType = compType,
                     sinBinMinutes = ageGroup.sinBinMinutes,
                     competition = competition,
+                    gradeCode = ageGroupStr,
                     kickoffDate = item.optString("kickoff_date", ""),
                     kickoffTime = item.optString("kickoff_time", "")
                 )

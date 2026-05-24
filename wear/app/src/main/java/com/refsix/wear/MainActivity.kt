@@ -98,9 +98,10 @@ class MainActivity : ComponentActivity() {
                 val backStack by navController.currentBackStack.collectAsState()
                 val currentRoute = backStack.lastOrNull()?.destination?.route
                 val swipeEnabled = currentRoute != "fullTime" &&
-                    currentRoute != "report/{index}"
+                    currentRoute != "report/{index}" &&
+                    currentRoute != "confirmEnd/{action}"
 
-                // Vibrate on sin bin expiry and scheduled half end
+                // Vibrate and navigate on timer events
                 LaunchedEffect(Unit) {
                     matchViewModel.uiEvents.collect { event ->
                         when (event) {
@@ -119,6 +120,20 @@ class MainActivity : ComponentActivity() {
                                         -1
                                     )
                                 )
+                                navController.navigate("halfTime") {
+                                    popUpTo("match") { inclusive = false }
+                                }
+                            }
+                            is MatchUiEvent.FullTimeAutoReached -> {
+                                vibrator?.vibrate(
+                                    VibrationEffect.createWaveform(
+                                        longArrayOf(0, 600, 150, 600, 150, 600, 150, 600),
+                                        -1
+                                    )
+                                )
+                                navController.navigate("confirmEnd/fullTime") {
+                                    popUpTo("match") { inclusive = false }
+                                }
                             }
                             is MatchUiEvent.FullTimeAlert -> {
                                 vibrator?.vibrate(
@@ -233,6 +248,17 @@ class MainActivity : ComponentActivity() {
                         SinBinScreen(
                             viewModel = matchViewModel,
                             onDismiss = { navController.popBackStack() }
+                        )
+                    }
+
+                    composable(
+                        route = "confirmEnd/{action}",
+                        arguments = listOf(navArgument("action") { type = NavType.StringType })
+                    ) { entry ->
+                        ConfirmEndMatchScreen(
+                            action = entry.arguments?.getString("action") ?: "fullTime",
+                            viewModel = matchViewModel,
+                            navController = navController
                         )
                     }
 
