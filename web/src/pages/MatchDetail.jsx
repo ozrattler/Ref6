@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { pb } from '../lib/pb'
 import { kitStyle } from '../lib/colours'
 import { useAuth } from '../lib/auth'
+import { calcTotalDistanceKm } from '../lib/gps'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -149,8 +150,8 @@ export default function MatchDetail() {
 export function MatchReport({ match: m, incidents = [] }) {
   const gpsTrack  = parseGpsTrack(m.gps_track)
   const hasGps    = gpsTrack.length > 0 || incidents.some(i => i.latitude && i.longitude)
-  const hasStats  = m.total_distance_km || m.average_speed_kmh || m.max_speed_kmh
-                 || m.avg_heart_rate   || m.max_heart_rate
+  const hasStats  = gpsTrack.length > 1 || m.total_distance_km || m.average_speed_kmh
+                 || m.max_speed_kmh   || m.avg_heart_rate    || m.max_heart_rate
   const dateLabel = buildDateLabel(m)
 
   return (
@@ -183,7 +184,7 @@ export function MatchReport({ match: m, incidents = [] }) {
       )}
 
       {/* 6. Performance stats */}
-      {hasStats && <PerformanceStats match={m} />}
+      {hasStats && <PerformanceStats match={m} gpsTrack={gpsTrack} />}
 
       {/* 7. GPS pitch heatmap */}
       {hasGps && <PitchMapSection gpsTrack={gpsTrack} incidents={incidents} />}
@@ -323,9 +324,10 @@ function CardLine({ incident: i }) {
 
 // ── Performance stats ─────────────────────────────────────────────────────────
 
-function PerformanceStats({ match: m }) {
+function PerformanceStats({ match: m, gpsTrack = [] }) {
+  const distKm = gpsTrack.length > 1 ? calcTotalDistanceKm(gpsTrack) : Number(m.total_distance_km)
   const stats = [
-    m.total_distance_km > 0 && { value: `${Number(m.total_distance_km).toFixed(1)} km`,  label: 'Distance' },
+    distKm > 0 && { value: `${distKm.toFixed(1)} km`, label: 'Distance' },
     m.average_speed_kmh > 0 && { value: `${Number(m.average_speed_kmh).toFixed(1)} km/h`, label: 'Avg Speed' },
     m.max_speed_kmh     > 0 && { value: `${Number(m.max_speed_kmh).toFixed(1)} km/h`,     label: 'Max Speed' },
     m.avg_heart_rate    > 0 && { value: `${m.avg_heart_rate} bpm`,                        label: 'Avg HR' },
