@@ -990,6 +990,21 @@ body {
 .edit-actions .btn-ghost { flex-shrink: 0; }
 .edit-actions .btn-submit { flex: 1; }
 
+/* ── Incident editor (inside edit form) ── */
+.inc-editor { margin-top: 4px; }
+.inc-editor-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.85rem;
+}
+.inc-editor-row:last-of-type { border-bottom: none; }
+.inc-editor-type { font-weight: 600; white-space: nowrap; flex-shrink: 0; min-width: 72px; }
+.inc-editor-info { flex: 1; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inc-editor-actions { display: flex; gap: 4px; flex-shrink: 0; }
+
 /* ── Fixture detail ── */
 .fixture-vs-badge {
   font-size: 0.85rem !important;

@@ -116,7 +116,9 @@ export default function MatchDetail() {
 
       {editing ? (
         <EditForm form={form} set={set} onSave={handleSave} saving={saving}
-          onCancel={() => { setForm(toForm(match)); setEditing(false) }} />
+          onCancel={() => { setForm(toForm(match)); setEditing(false) }}
+          matchId={id} incidents={incidents} setIncidents={setIncidents}
+          homeTeam={match.home_team || 'Home'} awayTeam={match.away_team || 'Away'} />
       ) : (
         <>
           <div className="detail-tab-bar">
@@ -696,6 +698,192 @@ export function MatchTimeline({ match: m, incidents = [] }) {
   )
 }
 
+// ── Incident editor ───────────────────────────────────────────────────────────
+
+const INC_TYPES = [
+  { value: 'GOAL',        label: 'Goal',        color: '#22c55e' },
+  { value: 'YELLOW_CARD', label: 'Yellow Card',  color: '#eab308' },
+  { value: 'RED_CARD',    label: 'Red Card',     color: '#ef4444' },
+  { value: 'SIN_BIN',     label: 'Sin Bin',      color: '#f97316' },
+]
+
+function incTypeColor(type) {
+  return INC_TYPES.find(t => t.value === type)?.color || '#6b7280'
+}
+function incTypeLabel(type) {
+  return INC_TYPES.find(t => t.value === type)?.label || type
+}
+
+function blankInc(matchId) {
+  return { match_id: matchId, type: 'YELLOW_CARD', team: '', minute: '', player_number: '', player_name: '', offence_description: '', goal_type: '' }
+}
+
+function IncidentsEditor({ matchId, incidents, setIncidents, homeTeam, awayTeam }) {
+  const [editingInc, setEditingInc] = useState(null)  // null | incident object (new or existing)
+
+  async function handleSaveInc(data) {
+    try {
+      if (data.id) {
+        const updated = await pb.collection('incidents').update(data.id, {
+          type: data.type, team: data.team,
+          minute: Number(data.minute) || 0,
+          player_number: data.player_number,
+          player_name: data.player_name,
+          offence_description: data.offence_description,
+          goal_type: data.goal_type,
+        })
+        setIncidents(prev => prev.map(i => i.id === updated.id ? updated : i))
+      } else {
+        const created = await pb.collection('incidents').create({
+          match_id: matchId,
+          type: data.type, team: data.team,
+          minute: Number(data.minute) || 0,
+          player_number: data.player_number,
+          player_name: data.player_name,
+          offence_description: data.offence_description,
+          goal_type: data.goal_type,
+        })
+        setIncidents(prev => [...prev, created])
+      }
+      setEditingInc(null)
+    } catch (err) {
+      window.alert('Save failed: ' + err.message)
+    }
+  }
+
+  async function handleDeleteInc(id) {
+    if (!window.confirm('Delete this incident?')) return
+    try {
+      await pb.collection('incidents').delete(id)
+      setIncidents(prev => prev.filter(i => i.id !== id))
+    } catch (err) {
+      window.alert('Delete failed: ' + err.message)
+    }
+  }
+
+  const sorted = [...incidents].sort((a, b) => (a.minute || 0) - (b.minute || 0))
+
+  return (
+    <div className="inc-editor">
+      {sorted.length === 0 && (
+        <p style={{ color: 'var(--muted)', fontSize: '0.85rem', margin: '4px 0 8px' }}>No incidents recorded.</p>
+      )}
+      {sorted.map(inc => (
+        <div key={inc.id} className="inc-editor-row">
+          <span className="inc-editor-type" style={{ color: incTypeColor(inc.type) }}>
+            {incTypeLabel(inc.type)}
+          </span>
+          <span className="inc-editor-info">
+            {inc.minute ? `${inc.minute}'` : ''}{' '}
+            {inc.team}{inc.player_number ? ` #${inc.player_number}` : ''}
+            {inc.player_name ? ` ${inc.player_name}` : ''}
+            {inc.offence_description ? ` — ${inc.offence_description}` : ''}
+            {inc.goal_type ? ` (${inc.goal_type})` : ''}
+          </span>
+          <div className="inc-editor-actions">
+            <button className="btn-edit" onClick={() => setEditingInc({ ...inc })}>Edit</button>
+            <button className="btn-delete-sm" onClick={() => handleDeleteInc(inc.id)}>×</button>
+          </div>
+        </div>
+      ))}
+      <button
+        className="btn-ghost"
+        style={{ marginTop: 6, fontSize: '0.85rem' }}
+        onClick={() => setEditingInc(blankInc(matchId))}
+      >
+        + Add Incident
+      </button>
+      {editingInc && (
+        <IncidentModal
+          data={editingInc}
+          homeTeam={homeTeam}
+          awayTeam={awayTeam}
+          onSave={handleSaveInc}
+          onClose={() => setEditingInc(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+function IncidentModal({ data, homeTeam, awayTeam, onSave, onClose }) {
+  const [form, setForm] = useState({ ...data })
+  const [saving, setSaving] = useState(false)
+  const isGoal = form.type === 'GOAL'
+
+  function set(k, v) { setForm(f => ({ ...f, [k]: v })) }
+
+  async function handleSave() {
+    setSaving(true)
+    await onSave(form)
+    setSaving(false)
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="modal">
+        <div className="modal-title">{data.id ? 'Edit Incident' : 'Add Incident'}</div>
+
+        <div className="form-group">
+          <label className="form-label">Type</label>
+          <select className="form-input" value={form.type} onChange={e => set('type', e.target.value)}>
+            {INC_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+          </select>
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">Team</label>
+          <select className="form-input" value={form.team} onChange={e => set('team', e.target.value)}>
+            <option value="">— select —</option>
+            <option value={homeTeam}>{homeTeam}</option>
+            <option value={awayTeam}>{awayTeam}</option>
+          </select>
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">Minute</label>
+          <input className="form-input" type="number" min="1" max="120"
+            value={form.minute} onChange={e => set('minute', e.target.value)} />
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">Player Number</label>
+          <input className="form-input" value={form.player_number}
+            onChange={e => set('player_number', e.target.value)} autoComplete="off" />
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">Player Name</label>
+          <input className="form-input" value={form.player_name}
+            onChange={e => set('player_name', e.target.value)} autoComplete="off" />
+        </div>
+
+        {isGoal ? (
+          <div className="form-group">
+            <label className="form-label">Goal Type</label>
+            <input className="form-input" value={form.goal_type}
+              onChange={e => set('goal_type', e.target.value)}
+              placeholder="e.g. Ordinary, Penalty, Own Goal" autoComplete="off" />
+          </div>
+        ) : (
+          <div className="form-group">
+            <label className="form-label">Offence</label>
+            <input className="form-input" value={form.offence_description}
+              onChange={e => set('offence_description', e.target.value)} autoComplete="off" />
+          </div>
+        )}
+
+        <div className="modal-actions">
+          <button className="btn-ghost" onClick={onClose}>Cancel</button>
+          <button className="btn-primary-sm" onClick={handleSave} disabled={saving}>
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Edit form ─────────────────────────────────────────────────────────────────
 
 function toForm(m) {
@@ -718,7 +906,7 @@ function toForm(m) {
   }
 }
 
-function EditForm({ form, set, onSave, saving, onCancel }) {
+function EditForm({ form, set, onSave, saving, onCancel, matchId, incidents = [], setIncidents, homeTeam = 'Home', awayTeam = 'Away' }) {
   return (
     <div className="edit-form-wrap">
       <div className="form-card">
@@ -777,6 +965,15 @@ function EditForm({ form, set, onSave, saving, onCancel }) {
               onChange={e => set('fourthOfficial', e.target.value)} autoComplete="off" />
           </div>
         </div>
+
+        <div className="section-label">Incidents</div>
+        <IncidentsEditor
+          matchId={matchId}
+          incidents={incidents}
+          setIncidents={setIncidents}
+          homeTeam={homeTeam}
+          awayTeam={awayTeam}
+        />
       </div>
       <div className="edit-actions">
         <button className="btn-ghost" onClick={onCancel}>Cancel</button>

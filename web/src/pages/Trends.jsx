@@ -53,7 +53,7 @@ export default function Trends() {
         requestKey: null,
       }),
       pb.collection('incidents').getList(1, 5000, {
-        fields: 'id,match_id,type',
+        fields: 'id,match_id,type,offence_description',
         requestKey: null,
       }).catch(() => ({ items: [] })),
     ])
@@ -101,7 +101,7 @@ export default function Trends() {
   // ── Incidents ────────────────────────────────────────────────────────────────
   const yc = incidents.filter(i => i.type === 'YELLOW_CARD').length
   const rc = incidents.filter(i => i.type === 'RED_CARD').length
-  const sb = incidents.filter(i => i.type === 'SIN_BIN').length
+  const sb = incidents.filter(i => i.type === 'SIN_BIN' || (i.type === 'YELLOW_CARD' && i.offence_description === 'Dissent')).length
   const avgYc = n ? fmt1(yc / n) : '—'
   const avgRc = n ? fmt1(rc / n) : '—'
   const avgSb = n ? fmt1(sb / n) : '—'

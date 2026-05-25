@@ -61,6 +61,8 @@ export default function Fixtures() {
   const [restoring,     setRestoring]     = useState(null)   // id being restored
   const [deleting,      setDeleting]      = useState(null)   // id being deleted
   const [importModal,   setImportModal]   = useState(null)   // null | parsed state
+  const [selected,      setSelected]      = useState(new Set())
+  const [bulkDeleting,  setBulkDeleting]  = useState(false)
   const fileInputRef = useRef(null)
   const navigate = useNavigate()
   const { isAdmin } = useAuth()
@@ -86,6 +88,46 @@ export default function Fixtures() {
       })
       .catch(e => { setError(e.message); setLoading(false) })
   }, [])
+
+  const toggle = id => setSelected(prev => {
+    const next = new Set(prev)
+    next.has(id) ? next.delete(id) : next.add(id)
+    return next
+  })
+
+  const allSelected = fixtures.length > 0 && selected.size === fixtures.length
+  const toggleAll   = () => setSelected(
+    allSelected ? new Set() : new Set(fixtures.map(f => f.id))
+  )
+
+  async function handleDeleteSelected() {
+    const count = selected.size
+    if (!window.confirm(`Delete ${count} fixture(s)? This cannot be undone.`)) return
+    setBulkDeleting(true)
+    try {
+      const ids = [...selected]
+      for (const id of ids) {
+        await pb.collection('match_setups').delete(id, { requestKey: null })
+      }
+      setFixtures(prev => prev.filter(f => !selected.has(f.id)))
+      setSelected(new Set())
+    } catch (err) {
+      window.alert(`Delete failed: ${err.message}`)
+    } finally {
+      setBulkDeleting(false)
+    }
+  }
+
+  async function handleDeleteFixture(id) {
+    if (!window.confirm('Delete this fixture? This cannot be undone.')) return
+    try {
+      await pb.collection('match_setups').delete(id, { requestKey: null })
+      setFixtures(prev => prev.filter(f => f.id !== id))
+      setSelected(prev => { const next = new Set(prev); next.delete(id); return next })
+    } catch (err) {
+      window.alert(`Delete failed: ${err.message}`)
+    }
+  }
 
   async function handleRestore(id) {
     setRestoring(id)
@@ -215,6 +257,25 @@ export default function Fixtures() {
         )}
       </div>
 
+      {isAdmin && fixtures.length > 0 && (
+        <div className="mh-toolbar">
+          <label className="mh-select-all">
+            <input
+              type="checkbox"
+              className="mh-checkbox"
+              checked={allSelected}
+              onChange={toggleAll}
+            />
+            <span>{allSelected ? 'Deselect All' : 'Select All'}</span>
+          </label>
+          {selected.size > 0 && (
+            <button className="btn-danger-sm" onClick={handleDeleteSelected} disabled={bulkDeleting}>
+              {bulkDeleting ? 'Deleting…' : `Delete ${selected.size}`}
+            </button>
+          )}
+        </div>
+      )}
+
       {importModal && (
         <ExcelImportModal
           state={importModal}
@@ -232,7 +293,24 @@ export default function Fixtures() {
               {formatDayHeader(g.key === '__nodate__' ? null : g.key)}
             </div>
             {g.items.map(f => (
-              <FixtureCard key={f.id} fixture={f} onClick={() => navigate(`/fixture/${f.id}`)} />
+              <div key={f.id} className={isAdmin ? 'mc2-wrap' : undefined}>
+                {isAdmin && (
+                  <label className="mc2-check-area">
+                    <input
+                      type="checkbox"
+                      className="mh-checkbox"
+                      checked={selected.has(f.id)}
+                      onChange={() => toggle(f.id)}
+                    />
+                  </label>
+                )}
+                <FixtureCard
+                  fixture={f}
+                  onClick={() => navigate(`/fixture/${f.id}`)}
+                  isAdmin={isAdmin}
+                  onDelete={() => handleDeleteFixture(f.id)}
+                />
+              </div>
             ))}
           </div>
         ))
@@ -371,11 +449,11 @@ function LoadedFixtureCard({ fixture: f, restoring, deleting, onRestore, onEdit,
   )
 }
 
-function FixtureCard({ fixture: f, onClick }) {
+function FixtureCard({ fixture: f, onClick, isAdmin, onDelete }) {
   const cd = countdown(f.kickoff_date, f.kickoff_time)
 
   return (
-    <div className="fixture-card" onClick={onClick} role="button" tabIndex={0}
+    <div className="fixture-card" style={{ position: 'relative' }} onClick={onClick} role="button" tabIndex={0}
       onKeyDown={e => e.key === 'Enter' && onClick()}>
       <div className="fixture-card-top">
         {f.competition && <span className="fixture-competition">{f.competition}</span>}
@@ -402,6 +480,15 @@ function FixtureCard({ fixture: f, onClick }) {
         {f.venue   && <span className="fixture-venue">📍 {f.venue}</span>}
         {f.referee && <span className="fixture-official">🟡 {f.referee}</span>}
       </div>
+      {isAdmin && (
+        <button
+          className="btn-delete-sm"
+          style={{ position: 'absolute', top: 6, right: 6 }}
+          onClick={e => { e.stopPropagation(); onDelete() }}
+        >
+          ×
+        </button>
+      )}
     </div>
   )
 }
