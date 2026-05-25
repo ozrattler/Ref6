@@ -68,7 +68,9 @@ class PocketBaseSync(private val context: Context) {
         return caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
     }
 
-    suspend fun fetchPendingMatchSetups(): List<MatchSetupData> = withContext(Dispatchers.IO) {
+    // Returns the list of pending setups on success, or null if the request failed.
+    // An empty list means PocketBase responded successfully with zero pending setups.
+    suspend fun fetchPendingMatchSetups(): List<MatchSetupData>? = withContext(Dispatchers.IO) {
         try {
             val filter = URLEncoder.encode("(status='pending')", "UTF-8")
             val url = "$baseUrl/match_setups/records?filter=$filter&sort=-created&perPage=50"
@@ -82,7 +84,7 @@ class PocketBaseSync(private val context: Context) {
             if (code !in 200..299) {
                 val errBody = conn.errorStream?.bufferedReader()?.readText()
                 Log.e(TAG, "fetchPendingMatchSetups: error HTTP $code body=$errBody")
-                return@withContext emptyList()
+                return@withContext null
             }
             val body = conn.inputStream.bufferedReader().readText()
             conn.disconnect()
@@ -124,7 +126,7 @@ class PocketBaseSync(private val context: Context) {
             }
         } catch (e: Exception) {
             Log.e(TAG, "fetchPendingMatchSetups: exception", e)
-            emptyList()
+            null
         }
     }
 

@@ -287,7 +287,7 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun processGpsLocation(location: Location) {
-        if (location.hasAccuracy() && location.accuracy > 50f) return
+        if (location.hasAccuracy() && location.accuracy > 100f) return
         val rawSpeedMs = if (location.hasSpeed()) location.speed else 0f
         lastLocation = location
 
@@ -305,13 +305,14 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
                 speedMs = rawSpeedMs
             )
 
-            // Only count distance between consecutive points when the implied speed
-            // is plausible (≤ 20 km/h). GPS drift between updates produces large
-            // coordinate jumps that would otherwise inflate both distance and speed.
+            // Count distance when implied speed is plausible. The speed cap is the
+            // sole guard against GPS coordinate jumps — the upper time bound was
+            // redundant and was dropping real movement during infrequent Wear OS
+            // GPS updates (which routinely arrive 20–40 s apart in ambient mode).
             val distanceAdded = if (s.gpsPoints.isNotEmpty()) {
                 val prev = s.gpsPoints.last()
                 val timeDeltaSec = (now - prev.timestamp) / 1000L
-                if (timeDeltaSec in 1L..15L) {
+                if (timeDeltaSec >= 1L) {
                     val results = FloatArray(1)
                     Location.distanceBetween(prev.lat, prev.lng, newPoint.lat, newPoint.lng, results)
                     val impliedSpeedMs = results[0] / timeDeltaSec
