@@ -77,7 +77,7 @@ fun SetupScreen(
             )
         }
 
-        if (hasResumableMatch) {
+        if (hasResumableMatch && state.phase == com.refsix.wear.data.MatchPhase.SETUP) {
             item {
                 Chip(
                     label = {

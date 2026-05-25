@@ -99,7 +99,8 @@ class MainActivity : ComponentActivity() {
                 val currentRoute = backStack.lastOrNull()?.destination?.route
                 val swipeEnabled = currentRoute != "fullTime" &&
                     currentRoute != "report/{index}" &&
-                    currentRoute != "confirmEnd/{action}"
+                    currentRoute != "confirmEnd/{action}" &&
+                    currentRoute != "cardConfirm"
 
                 // Vibrate and navigate on timer events
                 LaunchedEffect(Unit) {
@@ -215,7 +216,8 @@ class MainActivity : ComponentActivity() {
                             onCardRecorded = {
                                 navController.popBackStack()
                                 matchViewModel.signalReturnToCenter()
-                            }
+                            },
+                            onReadyToConfirm = { navController.navigate("cardConfirm") }
                         )
                     }
 
@@ -233,7 +235,21 @@ class MainActivity : ComponentActivity() {
                             onCardRecorded = {
                                 navController.popBackStack()
                                 matchViewModel.signalReturnToCenter()
-                            }
+                            },
+                            onReadyToConfirm = { navController.navigate("cardConfirm") }
+                        )
+                    }
+
+                    composable("cardConfirm") {
+                        CardConfirmScreen(
+                            viewModel = matchViewModel,
+                            onConfirm = {
+                                navController.navigate("match") {
+                                    popUpTo("setup") { inclusive = false }
+                                }
+                                matchViewModel.signalReturnToCenter()
+                            },
+                            onGoBack = { navController.popBackStack() }
                         )
                     }
 
@@ -309,6 +325,13 @@ class MainActivity : ComponentActivity() {
                         )
                     }
 
+                    composable("cardsSummary") {
+                        CardsSummaryScreen(
+                            viewModel = matchViewModel,
+                            onDismiss = { navController.popBackStack() }
+                        )
+                    }
+
                     composable(
                         route = "report/{index}",
                         arguments = listOf(
@@ -325,9 +348,11 @@ class MainActivity : ComponentActivity() {
                 }
 
                 // On first launch, auto-resume any in-progress match before the user sees setup.
+                // Both guards (here and inside resumeMatch) prevent activity recreation from
+                // accidentally calling resumeMatch while a match is already running.
                 val hasResumeOnStart = remember { matchViewModel.hasResumableMatch.value }
                 LaunchedEffect(Unit) {
-                    if (hasResumeOnStart) {
+                    if (hasResumeOnStart && matchViewModel.state.value.phase == MatchPhase.SETUP) {
                         matchViewModel.resumeMatch()
                         val phase = matchViewModel.state.value.phase
                         val dest = if (phase == MatchPhase.HALF_TIME) "halfTime" else "match"

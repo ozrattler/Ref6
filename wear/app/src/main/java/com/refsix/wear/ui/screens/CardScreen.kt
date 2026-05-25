@@ -11,7 +11,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
@@ -20,13 +19,15 @@ import com.refsix.wear.data.CardType
 import com.refsix.wear.data.Offences
 import com.refsix.wear.ui.theme.*
 import com.refsix.wear.viewmodel.MatchViewModel
+import com.refsix.wear.viewmodel.PendingCard
 
 @Composable
 fun CardScreen(
     viewModel: MatchViewModel,
     teamKey: String? = null,
     cardTypeKey: String? = null,
-    onCardRecorded: () -> Unit
+    onCardRecorded: () -> Unit,
+    onReadyToConfirm: () -> Unit = {}
 ) {
     val state by viewModel.state.collectAsState()
 
@@ -53,17 +54,38 @@ fun CardScreen(
         selectedTeam != null &&
         playerIdentifier.isNotEmpty() &&
         state.playerYellowCount(selectedTeam!!, playerIdentifier) >= 1
-
     val isDissentSelected = !isCoach &&
         selectedCard == CardType.YELLOW &&
         selectedOffence == Offences.DISSENT &&
         !isSecondYellow
 
+    // Navigate to confirm as soon as all required fields are present.
+    fun tryNavigate(team: String?, card: CardType?, numStr: String, playerOk: Boolean, offence: String?) {
+        if (team == null || card == null || !playerOk || offence == null) return
+        val secYellow = card == CardType.YELLOW && state.playerYellowCount(team, numStr) >= 1
+        val dissentBin = numStr != "Coach" &&
+            card == CardType.YELLOW &&
+            offence == Offences.DISSENT &&
+            !secYellow
+        viewModel.setPendingCard(
+            PendingCard(
+                team = team,
+                playerNumber = numStr,
+                cardType = card,
+                offence = offence,
+                isSecondYellow = secYellow,
+                isDissentSinBin = dissentBin,
+                sinBinMinutes = state.sinBinMinutes
+            )
+        )
+        onReadyToConfirm()
+    }
+
     ScalingLazyColumn(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
-        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
+        contentPadding = PaddingValues(start = 16.dp, top = 20.dp, end = 16.dp, bottom = 32.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         item {
             Text(
@@ -74,56 +96,54 @@ fun CardScreen(
             )
         }
 
-        // Step 1: Team (skip if pre-filled)
+        // Team selection (skip if pre-filled)
         if (prefilledTeam == null) {
-            item { SectionLabel("1. Team") }
+            item { SectionLabel("Team") }
             item {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
                     SelectChip(
                         label = state.homeTeam.take(6),
                         selected = selectedTeam == state.homeTeam,
-                        onClick = { selectedTeam = state.homeTeam }
+                        onClick = {
+                            selectedTeam = state.homeTeam
+                            tryNavigate(state.homeTeam, selectedCard, if (isCoach) "Coach" else "$playerNumber", isCoach || playerNumber > 0, selectedOffence)
+                        }
                     )
                     SelectChip(
                         label = state.awayTeam.take(6),
                         selected = selectedTeam == state.awayTeam,
-                        onClick = { selectedTeam = state.awayTeam }
+                        onClick = {
+                            selectedTeam = state.awayTeam
+                            tryNavigate(state.awayTeam, selectedCard, if (isCoach) "Coach" else "$playerNumber", isCoach || playerNumber > 0, selectedOffence)
+                        }
                     )
                 }
             }
         }
 
-        // Step 2: Card type (skip if pre-filled)
+        // Card type selection (skip if pre-filled)
         if (prefilledCardType == null) {
-            val stepNum = if (prefilledTeam == null) "2" else "1"
-            item { SectionLabel("$stepNum. Card Type") }
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     CardTypeChip("YEL", CardType.YELLOW, RefYellow, selectedCard) {
-                        selectedCard = it
-                        selectedOffence = null
+                        selectedCard = it; selectedOffence = null
                     }
                     CardTypeChip("RED", CardType.RED, RefRed, selectedCard) {
-                        selectedCard = it
-                        selectedOffence = null
+                        selectedCard = it; selectedOffence = null
                     }
                     if (!isCoach) {
                         CardTypeChip("SIN", CardType.SIN_BIN, RefOrange, selectedCard) {
-                            selectedCard = it
-                            selectedOffence = null
+                            selectedCard = it; selectedOffence = null
                         }
                     }
                 }
             }
         }
 
-        // Step: Player/Coach
-        val playerStepNum = when {
-            prefilledTeam != null && prefilledCardType != null -> "1"
-            prefilledTeam != null || prefilledCardType != null -> "2"
-            else -> "3"
-        }
-        item { SectionLabel("$playerStepNum. Player / Coach") }
+        // Player / Coach selector
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 SelectChip(
@@ -139,6 +159,8 @@ fun CardScreen(
                         if (selectedCard == CardType.SIN_BIN) {
                             selectedCard = null
                             selectedOffence = null
+                        } else {
+                            tryNavigate(selectedTeam, selectedCard, "Coach", true, selectedOffence)
                         }
                     }
                 )
@@ -148,27 +170,24 @@ fun CardScreen(
             item {
                 PlayerNumberPicker(
                     value = playerNumber,
-                    onValueChange = { playerNumber = it }
+                    onValueChange = { newNum ->
+                        val wasZero = playerNumber == 0
+                        playerNumber = newNum
+                        if (wasZero && newNum > 0) {
+                            tryNavigate(selectedTeam, selectedCard, "$newNum", true, selectedOffence)
+                        }
+                    }
                 )
             }
         }
 
-        // 2nd yellow warning — always results in red card, no exceptions
+        // 2nd yellow warning
         if (isSecondYellow) {
-            item {
-                NoticeBanner(text = "2nd yellow — AUTO RED CARD", color = RefRed)
-            }
+            item { NoticeBanner(text = "2nd yellow — AUTO RED CARD", color = RefRed) }
         }
 
-        // Step: Offence
+        // Offence list — tapping an offence auto-navigates when all other fields are set
         if (selectedCard != null) {
-            val offenceStepNum = when {
-                prefilledTeam != null && prefilledCardType != null -> "2"
-                prefilledTeam != null || prefilledCardType != null -> "3"
-                else -> "4"
-            }
-            item { SectionLabel("$offenceStepNum. Offence") }
-
             val offences = Offences.forCardType(selectedCard!!)
             items(offences.size) { index ->
                 val offence = offences[index]
@@ -195,8 +214,17 @@ fun CardScreen(
                         .clip(RoundedCornerShape(8.dp))
                         .background(bgColor)
                         .border(1.dp, borderColor, RoundedCornerShape(8.dp))
-                        .clickable { selectedOffence = offence }
-                        .padding(horizontal = 10.dp, vertical = 8.dp)
+                        .clickable {
+                            selectedOffence = offence
+                            tryNavigate(
+                                team = selectedTeam,
+                                card = selectedCard,
+                                numStr = if (isCoach) "Coach" else "$playerNumber",
+                                playerOk = isCoach || playerNumber > 0,
+                                offence = offence
+                            )
+                        }
+                        .padding(horizontal = 8.dp, vertical = 6.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -233,33 +261,6 @@ fun CardScreen(
                 )
             }
         }
-
-        if (selectedTeam != null && selectedCard != null && selectedOffence != null && (isCoach || playerNumber > 0)) {
-            item { Spacer(modifier = Modifier.height(4.dp)) }
-            item {
-                val chipColor = when {
-                    isSecondYellow -> RefRed
-                    isDissentSelected -> RefOrange
-                    selectedCard == CardType.RED -> RefRed
-                    selectedCard == CardType.SIN_BIN -> RefOrange
-                    else -> RefYellow
-                }
-                Chip(
-                    label = { Text("CONFIRM", fontWeight = FontWeight.Bold) },
-                    onClick = {
-                        viewModel.recordCard(
-                            team = selectedTeam!!,
-                            playerNumber = if (isCoach) "Coach" else "$playerNumber",
-                            cardType = selectedCard!!,
-                            offence = selectedOffence!!
-                        )
-                        onCardRecorded()
-                    },
-                    colors = ChipDefaults.chipColors(backgroundColor = chipColor),
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        }
     }
 }
 
@@ -271,7 +272,7 @@ private fun NoticeBanner(text: String, color: Color) {
             .clip(RoundedCornerShape(6.dp))
             .background(color.copy(alpha = 0.12f))
             .border(1.dp, color, RoundedCornerShape(6.dp))
-            .padding(horizontal = 10.dp, vertical = 6.dp)
+            .padding(horizontal = 8.dp, vertical = 5.dp)
     ) {
         Text(
             text = text,

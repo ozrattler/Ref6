@@ -49,6 +49,16 @@ sealed class MatchUiEvent {
     object HalfTimeCountdownExpired : MatchUiEvent()
 }
 
+data class PendingCard(
+    val team: String,
+    val playerNumber: String,
+    val cardType: CardType,
+    val offence: String,
+    val isSecondYellow: Boolean,
+    val isDissentSinBin: Boolean,
+    val sinBinMinutes: Int
+)
+
 class MatchViewModel(application: Application) : AndroidViewModel(application) {
 
     private val matchStorage = MatchStorage(application)
@@ -81,6 +91,12 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
     private val _hasResumableMatch = MutableStateFlow(matchStorage.hasInProgressState())
     val hasResumableMatch: StateFlow<Boolean> = _hasResumableMatch.asStateFlow()
 
+    private val _pendingCard = MutableStateFlow<PendingCard?>(null)
+    val pendingCard: StateFlow<PendingCard?> = _pendingCard.asStateFlow()
+
+    private val _sinBinAlert = MutableStateFlow<Pair<String, String>?>(null)
+    val sinBinAlert: StateFlow<Pair<String, String>?> = _sinBinAlert.asStateFlow()
+
     private val _pendingSetups = MutableStateFlow<List<MatchSetupData>>(emptyList())
     val pendingSetups: StateFlow<List<MatchSetupData>> = _pendingSetups.asStateFlow()
 
@@ -100,6 +116,13 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
     init {
         launchTimer()
         viewModelScope.launch { syncUnsyncedMatches() }
+        // Retry any unsynced matches periodically on startup (covers airplane-mode case)
+        viewModelScope.launch {
+            repeat(5) {
+                delay(60_000L)
+                if (matchStorage.getUnsyncedMatches().isNotEmpty()) syncUnsyncedMatches()
+            }
+        }
         refreshPendingSetup()
         observeRunningForGps()
         observeRunningForDnd()
@@ -158,6 +181,9 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
                 justExpired.forEach { bin ->
                     _uiEvents.tryEmit(MatchUiEvent.SinBinExpired(bin.team, bin.playerNumber))
                 }
+                if (justExpired.isNotEmpty()) {
+                    _sinBinAlert.value = justExpired.last().let { it.team to it.playerNumber }
+                }
                 if (halfTimeAutoTrigger) {
                     callHalfTime()
                     _uiEvents.tryEmit(MatchUiEvent.HalfTimeAlert)
@@ -173,10 +199,14 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun observeRunningForDnd() {
         viewModelScope.launch {
-            _state.map { it.isRunning }.distinctUntilChanged().collect { running ->
+            _state.map {
+                it.phase == MatchPhase.FIRST_HALF ||
+                it.phase == MatchPhase.SECOND_HALF ||
+                it.phase == MatchPhase.HALF_TIME
+            }.distinctUntilChanged().collect { matchActive ->
                 val nm = notificationManager ?: return@collect
                 if (!nm.isNotificationPolicyAccessGranted) return@collect
-                if (running) {
+                if (matchActive) {
                     savedInterruptionFilter = nm.currentInterruptionFilter
                     nm.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_NONE)
                 } else {
@@ -307,7 +337,7 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     companion object {
-        private const val MAX_PLAUSIBLE_SPEED_MS = 3.333f  // 12 km/h
+        private const val MAX_PLAUSIBLE_SPEED_MS = 6.944f  // 25 km/h — covers referee sprinting
     }
 
     fun signalReturnToCenter() { _returnToCenterCount.update { it + 1 } }
@@ -386,6 +416,10 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun resumeMatch() {
+        // Guard: never overwrite a match that's already in progress. This prevents
+        // Wear OS activity recreation (screen-off/wrist-turn) from calling resumeMatch
+        // via the startup LaunchedEffect and stopping the running timer.
+        if (_state.value.phase != MatchPhase.SETUP) return
         val (savedState, htBreakStartMillis) = matchStorage.loadInProgressState() ?: return
         _state.value = savedState
         if (savedState.phase == MatchPhase.HALF_TIME) {
@@ -411,6 +445,7 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun callFullTime() {
+        if (_state.value.phase == MatchPhase.FULL_TIME) return
         _state.update { it.copy(phase = MatchPhase.FULL_TIME, isRunning = false) }
         matchStorage.clearInProgressState()
         _hasResumableMatch.value = false
@@ -419,13 +454,27 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _uiEvents.emit(MatchUiEvent.FullTimeAlert)
             syncUnsyncedMatches()
+            // Refresh the fixture list so next open of setup list shows current pending setups.
+            refreshPendingSetupInternal()
+        }
+        // Retry sync in background every 30 s for up to 5 min (handles airplane-mode case)
+        viewModelScope.launch {
+            repeat(10) {
+                delay(30_000L)
+                if (matchStorage.getUnsyncedMatches().isNotEmpty()) syncUnsyncedMatches()
+            }
         }
     }
 
     private suspend fun syncUnsyncedMatches() {
         if (!pocketBaseSync.isNetworkAvailable()) return
         matchStorage.getUnsyncedMatches().forEach { match ->
-            val pbId = pocketBaseSync.syncMatch(match)
+            var pbId: String? = null
+            for (attempt in 1..3) {
+                pbId = pocketBaseSync.syncMatch(match)
+                if (pbId != null) break
+                if (attempt < 3) delay(3_000L)
+            }
             if (pbId != null) {
                 matchStorage.markSynced(match.id, pbId)
                 _savedMatches.value = matchStorage.loadMatches()
@@ -434,23 +483,31 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun refreshPendingSetup() {
-        viewModelScope.launch {
-            _isFetchingSetups.value = true
-            val hasNetwork = pocketBaseSync.isNetworkAvailable()
-            Log.d("MatchViewModel", "refreshPendingSetup: hasNetwork=$hasNetwork")
-            if (hasNetwork) {
-                val setups = pocketBaseSync.fetchPendingMatchSetups()
+        viewModelScope.launch { refreshPendingSetupInternal() }
+    }
+
+    private suspend fun refreshPendingSetupInternal() {
+        _isFetchingSetups.value = true
+        val hasNetwork = pocketBaseSync.isNetworkAvailable()
+        Log.d("MatchViewModel", "refreshPendingSetup: hasNetwork=$hasNetwork")
+        if (hasNetwork) {
+            val setups = pocketBaseSync.fetchPendingMatchSetups()
+            if (setups != null) {
                 Log.d("MatchViewModel", "refreshPendingSetup: ${setups.size} pending setups")
                 _pendingSetups.value = setups
+            } else {
+                Log.w("MatchViewModel", "refreshPendingSetup: fetch failed, keeping existing list")
             }
-            _isFetchingSetups.value = false
         }
+        _isFetchingSetups.value = false
     }
 
     fun applyMatchSetup(setup: MatchSetupData) {
         _appliedSetup.value = setup
         _state.update {
             it.copy(
+                homeTeam = setup.homeTeam.ifBlank { "Home" },
+                awayTeam = setup.awayTeam.ifBlank { "Away" },
                 ageGroup = setup.ageGroup,
                 halfLengthMinutes = setup.halfLengthMinutes,
                 competitionType = setup.competitionType,
@@ -473,6 +530,9 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
     fun dismissPendingSetups() {
         _pendingSetups.value = emptyList()
     }
+
+    fun setPendingCard(card: PendingCard) { _pendingCard.value = card }
+    fun clearPendingCard() { _pendingCard.value = null }
 
     fun recordGoal(team: String, scorerNumber: String = "", scorerName: String = "", goalType: String = "") {
         val loc = lastLocation
@@ -593,6 +653,8 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
     fun dismissCardAlert() {
         _state.update { it.copy(cardAlert = null) }
     }
+
+    fun dismissSinBinAlert() { _sinBinAlert.value = null }
 
     fun returnFromSinBin(sinBinId: Long) {
         _state.update { s -> s.copy(sinBins = s.sinBins.filter { it.id != sinBinId }) }

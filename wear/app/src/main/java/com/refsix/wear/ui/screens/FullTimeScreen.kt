@@ -11,6 +11,7 @@ import androidx.compose.ui.unit.sp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.material.*
 import com.refsix.wear.data.EventType
+import com.refsix.wear.data.MatchPhase
 import com.refsix.wear.ui.theme.*
 import com.refsix.wear.viewmodel.MatchViewModel
 
@@ -107,6 +108,18 @@ fun FullTimeScreen(viewModel: MatchViewModel, onNewMatch: () -> Unit) {
                 },
                 colors = ChipDefaults.chipColors(backgroundColor = RefBlue),
                 modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        item {
+            CompactChip(
+                label = { Text("End Match", fontWeight = FontWeight.Bold) },
+                onClick = {
+                    if (state.phase != MatchPhase.FULL_TIME) viewModel.callFullTime()
+                    viewModel.resetMatch()
+                    onNewMatch()
+                },
+                colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF4A1A1A))
             )
         }
     }

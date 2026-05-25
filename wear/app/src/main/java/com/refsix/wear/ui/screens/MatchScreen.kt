@@ -5,16 +5,20 @@ package com.refsix.wear.ui.screens
 import android.graphics.Color as AndroidColor
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.*
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -32,6 +36,7 @@ import kotlinx.coroutines.delay
 @Composable
 fun MatchScreen(navController: NavController, viewModel: MatchViewModel) {
     val state by viewModel.state.collectAsState()
+    val sinBinAlert by viewModel.sinBinAlert.collectAsState()
     val pagerState = rememberPagerState(initialPage = 1) { 3 }
     val centerCount by viewModel.returnToCenterCount.collectAsState()
     LaunchedEffect(centerCount) {
@@ -65,7 +70,8 @@ fun MatchScreen(navController: NavController, viewModel: MatchViewModel) {
                 1 -> MainMatchPage(
                     state = state,
                     viewModel = viewModel,
-                    navController = navController
+                    navController = navController,
+                    onSwipeUp = { navController.navigate("cardsSummary") }
                 )
                 2 -> TeamActionPage(
                     team = state.awayTeam,
@@ -83,7 +89,47 @@ fun MatchScreen(navController: NavController, viewModel: MatchViewModel) {
                 .padding(bottom = 6.dp)
         )
 
-        // Card alert overlay
+        // Sin bin expiry alert — shown below card alert so card alert renders on top
+        sinBinAlert?.let { (team, playerNum) ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(0xDD000000)),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xFF1A1200))
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                ) {
+                    Text(
+                        text = "SIN BIN ENDED",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = RefOrange,
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        text = "${if (playerNum == "Coach") "Coach" else "#$playerNum"}  $team",
+                        style = MaterialTheme.typography.caption1,
+                        color = Color.White,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Chip(
+                        label = { Text("OK", fontWeight = FontWeight.Bold) },
+                        onClick = { viewModel.dismissSinBinAlert() },
+                        colors = ChipDefaults.chipColors(backgroundColor = RefOrange),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+        }
+
+        // Card alert overlay — on top of sin bin alert
         state.cardAlert?.let { alert ->
             Box(
                 modifier = Modifier
@@ -139,7 +185,8 @@ fun MatchScreen(navController: NavController, viewModel: MatchViewModel) {
 private fun MainMatchPage(
     state: MatchState,
     viewModel: MatchViewModel,
-    navController: NavController
+    navController: NavController,
+    onSwipeUp: () -> Unit = {}
 ) {
     val homeBins = state.activeSinBins
         .filter { it.team == state.homeTeam }
@@ -148,10 +195,34 @@ private fun MainMatchPage(
         .filter { it.team == state.awayTeam }
         .sortedBy { it.remainingSeconds(state.totalElapsedSeconds) }
 
+    var totalVerticalDrag by remember { mutableFloatStateOf(0f) }
+    var swipeTriggered by remember { mutableStateOf(false) }
+    var showMatchMenu by remember { mutableStateOf(false) }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black),
+            .background(Color.Black)
+            .pointerInput(Unit) {
+                detectVerticalDragGestures(
+                    onDragStart = { totalVerticalDrag = 0f; swipeTriggered = false },
+                    onVerticalDrag = { change, dragAmount ->
+                        totalVerticalDrag += dragAmount
+                        if (!swipeTriggered && totalVerticalDrag < -80f) {
+                            swipeTriggered = true
+                            change.consume()
+                            onSwipeUp()
+                        }
+                    }
+                )
+            }
+            // Long press opens match options without pausing the timer.
+            // The timer coroutine lives in viewModelScope and suspends only on
+            // delay() — pointer input handling on the main dispatcher cannot
+            // block or cancel it.
+            .pointerInput(Unit) {
+                detectTapGestures(onLongPress = { showMatchMenu = true })
+            },
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -228,7 +299,9 @@ private fun MainMatchPage(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable { navController.navigate("sinBin") }
-                        .padding(vertical = 2.dp),
+                        // 12 dp inset keeps text clear of the circular bezel at this
+                        // vertical position (≈40–50 dp below screen centre).
+                        .padding(horizontal = 12.dp, vertical = 2.dp),
                     verticalAlignment = Alignment.Top
                 ) {
                     Column(
@@ -266,20 +339,59 @@ private fun MainMatchPage(
                     }
                 }
             }
+        }
 
-            Spacer(modifier = Modifier.height(2.dp))
-
-            CompactChip(
-                label = {
+        // Match options menu — long press to open; timer keeps running throughout
+        if (showMatchMenu) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(0xEE000000)),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xFF1A1A2A))
+                        .padding(horizontal = 16.dp, vertical = 14.dp)
+                ) {
                     Text(
-                        text = if (state.isRunning) "PAUSE" else "START",
-                        fontWeight = FontWeight.Bold
+                        text = "MATCH OPTIONS",
+                        fontSize = 11.sp,
+                        color = Color.Gray
                     )
-                },
-                onClick = { viewModel.toggleTimer() },
-                colors = ChipDefaults.chipColors(backgroundColor = RefBlue)
-            )
-
+                    Chip(
+                        label = {
+                            Text(
+                                text = if (state.isRunning) "Pause Match" else "Resume Match",
+                                fontWeight = FontWeight.Bold
+                            )
+                        },
+                        onClick = {
+                            viewModel.toggleTimer()
+                            showMatchMenu = false
+                        },
+                        colors = ChipDefaults.chipColors(backgroundColor = RefBlue),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Chip(
+                        label = { Text("End Match", fontWeight = FontWeight.Bold) },
+                        onClick = {
+                            showMatchMenu = false
+                            navController.navigate("confirmEnd/fullTime")
+                        },
+                        colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF4A1A1A)),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    CompactChip(
+                        label = { Text("Cancel", fontWeight = FontWeight.Bold) },
+                        onClick = { showMatchMenu = false },
+                        colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF333333))
+                    )
+                }
+            }
         }
     }
 }
@@ -389,7 +501,9 @@ private fun KitTeamLabel(name: String, hexColour: String) {
     }
 }
 
-private fun String.toKitColor(): Color? {
-    if (isEmpty()) return null
-    return runCatching { Color(AndroidColor.parseColor(this)) }.getOrNull()
+internal fun String.toKitColor(): Color? {
+    val s = trim()
+    if (s.isEmpty()) return null
+    val hex = if (s.startsWith("#")) s else "#$s"
+    return runCatching { Color(AndroidColor.parseColor(hex)) }.getOrNull()
 }
