@@ -867,8 +867,8 @@ body {
 .fixture-card {
   background: var(--surface);
   border-radius: var(--radius);
-  padding: 14px 16px;
-  margin-bottom: 10px;
+  padding: 18px 20px;
+  margin-bottom: 12px;
   cursor: pointer;
   transition: background .15s;
   border: 1px solid var(--border);
@@ -878,23 +878,23 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
   flex-wrap: wrap;
 }
 .fixture-competition {
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   color: var(--muted);
   font-weight: 500;
 }
 .fixture-kotime {
-  font-size: 0.82rem;
+  font-size: 0.85rem;
   color: var(--muted);
   margin-left: auto;
 }
 .fixture-countdown {
   font-size: 0.75rem;
   font-weight: 700;
-  padding: 2px 8px;
+  padding: 3px 10px;
   border-radius: 20px;
   text-transform: uppercase;
   letter-spacing: .04em;
@@ -907,13 +907,13 @@ body {
 .fixture-teams {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 8px;
+  gap: 12px;
+  margin-bottom: 12px;
 }
 .fixture-team-block {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   flex: 1;
 }
 .fixture-team-block-away {
@@ -921,11 +921,11 @@ body {
   text-align: right;
 }
 .fixture-team-name {
-  font-size: 1rem;
+  font-size: 1.05rem;
   font-weight: 700;
 }
 .fixture-vs {
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   color: var(--muted);
   font-weight: 600;
   flex-shrink: 0;
@@ -933,15 +933,15 @@ body {
 .fixture-card-meta {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   flex-wrap: wrap;
 }
 .fixture-venue {
-  font-size: 0.8rem;
+  font-size: 0.82rem;
   color: var(--muted);
 }
 .fixture-official {
-  font-size: 0.8rem;
+  font-size: 0.82rem;
   color: var(--muted);
 }
 
