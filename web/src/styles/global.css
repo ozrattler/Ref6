@@ -872,7 +872,10 @@ body {
   cursor: pointer;
   transition: background .15s;
   border: 1px solid var(--border);
+  width: 100%;
+  box-sizing: border-box;
 }
+.mc2-wrap .fixture-card { flex: 1; margin-bottom: 0; }
 .fixture-card:hover { background: var(--surface-hover); }
 .fixture-card-top {
   display: flex;
