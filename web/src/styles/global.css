@@ -877,6 +877,7 @@ body {
 .fixture-card-top {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   margin-bottom: 12px;
   flex-wrap: wrap;
@@ -889,7 +890,6 @@ body {
 .fixture-kotime {
   font-size: 0.85rem;
   color: var(--muted);
-  margin-left: auto;
 }
 .fixture-countdown {
   font-size: 0.75rem;
@@ -913,11 +913,13 @@ body {
 .fixture-team-block {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 8px;
   flex: 1;
 }
 .fixture-team-block-away {
   flex-direction: row-reverse;
+  justify-content: flex-end;
   text-align: right;
 }
 .fixture-team-name {
@@ -933,6 +935,7 @@ body {
 .fixture-card-meta {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 12px;
   flex-wrap: wrap;
 }
