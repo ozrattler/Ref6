@@ -37,8 +37,8 @@ class GpsTracker(context: Context) {
         if (provider != null) {
             locationManager.requestLocationUpdates(
                 provider,
-                5_000L,    // min 5 s between updates
-                1f,        // min 1 m displacement
+                1_000L,    // min 1 s between updates
+                0f,        // no distance filter — capture every fix
                 l,
                 Looper.getMainLooper()
             )
