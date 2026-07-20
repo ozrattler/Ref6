@@ -1,6 +1,8 @@
 package com.refsix.wear.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -22,7 +24,6 @@ fun MatchSetupListScreen(
     val setups by viewModel.pendingSetups.collectAsState()
     val isFetching by viewModel.isFetchingSetups.collectAsState()
 
-    // Fetch fresh from PocketBase every time this screen opens.
     LaunchedEffect(Unit) { viewModel.refreshPendingSetup() }
 
     ScalingLazyColumn(
@@ -59,9 +60,8 @@ fun MatchSetupListScreen(
 
             else -> items(setups.size) { i ->
                 val setup = setups[i]
-                val detail = listOf(setup.competition, setup.ageGroup.label)
-                    .filter { it.isNotBlank() }
-                    .joinToString(" · ")
+                val hasGrade = setup.gradeCode.isNotBlank()
+                val hasCompetition = setup.competition.isNotBlank()
                 Chip(
                     label = {
                         Text(
@@ -70,8 +70,33 @@ fun MatchSetupListScreen(
                             fontSize = 13.sp
                         )
                     },
-                    secondaryLabel = if (detail.isNotBlank()) {
-                        { Text(text = detail, fontSize = 10.sp) }
+                    secondaryLabel = if (hasGrade || hasCompetition) {
+                        {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (hasGrade) {
+                                    Box(
+                                        modifier = Modifier
+                                            .background(Color(0xFF2E7D32), RoundedCornerShape(4.dp))
+                                            .padding(horizontal = 5.dp, vertical = 1.dp)
+                                    ) {
+                                        Text(
+                                            text = setup.gradeCode,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 10.sp,
+                                            color = Color.White
+                                        )
+                                    }
+                                    if (hasCompetition) Spacer(Modifier.width(5.dp))
+                                }
+                                if (hasCompetition) {
+                                    Text(
+                                        text = setup.competition,
+                                        fontSize = 10.sp,
+                                        color = Color.LightGray
+                                    )
+                                }
+                            }
+                        }
                     } else null,
                     onClick = {
                         viewModel.applyMatchSetup(setup)
