@@ -64,11 +64,25 @@ fun MatchSetupListScreen(
                 val hasCompetition = setup.competition.isNotBlank()
                 Chip(
                     label = {
-                        Text(
-                            text = "${setup.homeTeam.ifBlank { "?" }} vs ${setup.awayTeam.ifBlank { "?" }}",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "${setup.homeTeam.ifBlank { "?" }} vs ${setup.awayTeam.ifBlank { "?" }}",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                                modifier = Modifier.weight(1f)
+                            )
+                            if (setup.kickoffTime.isNotBlank()) {
+                                Text(
+                                    text = setup.kickoffTime,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp,
+                                    color = Color.White
+                                )
+                            }
+                        }
                     },
                     secondaryLabel = if (hasGrade || hasCompetition) {
                         {
