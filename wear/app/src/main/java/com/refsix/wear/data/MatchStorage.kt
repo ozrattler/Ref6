@@ -18,7 +18,10 @@ class MatchStorage(context: Context) {
 
     fun loadInProgressState(): Pair<MatchState, Long>? {
         val json = progressPrefs.getString("state", null) ?: return null
-        return runCatching { deserializeMatchState(json) }.getOrNull()
+        return runCatching { deserializeMatchState(json) }.getOrElse {
+            clearInProgressState()
+            null
+        }
     }
 
     fun clearInProgressState() {
@@ -27,6 +30,7 @@ class MatchStorage(context: Context) {
 
     private fun serializeMatchState(state: MatchState, htBreakStartMillis: Long): String {
         return JSONObject().apply {
+            put("schema_version", SCHEMA_VERSION)
             put("htBreakStartMillis", htBreakStartMillis)
             put("homeTeam", state.homeTeam)
             put("awayTeam", state.awayTeam)
@@ -93,6 +97,8 @@ class MatchStorage(context: Context) {
 
     private fun deserializeMatchState(json: String): Pair<MatchState, Long> {
         val obj = JSONObject(json)
+        val version = obj.optInt("schema_version", 0)
+        check(version == SCHEMA_VERSION) { "stale in-progress schema v$version (expected $SCHEMA_VERSION)" }
         val htBreakStartMillis = obj.optLong("htBreakStartMillis", 0L)
 
         val eventsArr = obj.getJSONArray("events")
@@ -223,6 +229,7 @@ class MatchStorage(context: Context) {
 
     companion object {
         private const val MAX_MATCHES = 5
+        const val SCHEMA_VERSION = 2  // bump whenever serialised fields change
 
         fun buildGpsTrackJson(state: MatchState): String {
             if (state.gpsPoints.isEmpty()) return ""

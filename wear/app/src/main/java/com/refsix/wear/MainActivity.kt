@@ -355,6 +355,14 @@ class MainActivity : ComponentActivity() {
                     if (hasResumeOnStart && matchViewModel.state.value.phase == MatchPhase.SETUP) {
                         matchViewModel.resumeMatch()
                         val phase = matchViewModel.state.value.phase
+                        if (phase == MatchPhase.SETUP) {
+                            // resumeMatch() found nothing to restore (stale/corrupt state was
+                            // already cleared) — send the user to the fixture list to pick a game.
+                            navController.navigate("setupList") {
+                                popUpTo("setup") { inclusive = false }
+                            }
+                            return@LaunchedEffect
+                        }
                         val dest = if (phase == MatchPhase.HALF_TIME) "halfTime" else "match"
                         navController.navigate(dest) {
                             popUpTo("setup") { inclusive = false }
