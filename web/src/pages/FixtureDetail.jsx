@@ -2,6 +2,15 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { pb } from '../lib/pb'
 import { kitStyle } from '../lib/colours'
+
+function formatTime12h(hhmm) {
+  if (!hhmm) return ''
+  const [h, m] = hhmm.split(':').map(Number)
+  if (isNaN(h) || isNaN(m)) return hhmm
+  const period = h < 12 ? 'AM' : 'PM'
+  const hour = h % 12 || 12
+  return `${hour}:${String(m).padStart(2, '0')}${period}`
+}
 import FixtureFormFields from '../components/FixtureFormFields'
 import { MatchReport } from './MatchDetail'
 import { useAuth } from '../lib/auth'
@@ -207,7 +216,7 @@ function FixtureView({ fixture: f }) {
         }))
       } catch { parts.push(f.kickoff_date) }
     }
-    if (f.kickoff_time) parts.push(`KO ${f.kickoff_time}`)
+    if (f.kickoff_time) parts.push(`KO ${formatTime12h(f.kickoff_time)}`)
     return parts.join(' · ') || null
   })()
 

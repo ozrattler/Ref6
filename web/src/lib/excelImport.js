@@ -134,6 +134,7 @@ export function parseExcelFixtures(buffer) {
     competition: colIdx(headers, 'Competition'),
     league:      colIdx(headers, 'League'),
     venue:       colIdx(headers, 'Venue'),
+    field:       colIdx(headers, 'Field'),
     referee:     colIdx(headers, 'R'),
     ar1:         colIdx(headers, 'A1'),
     ar2:         colIdx(headers, 'A2'),
@@ -154,8 +155,12 @@ export function parseExcelFixtures(buffer) {
     const rowStatus = get(row, C.status).toUpperCase()
     if (rowStatus === 'PLAYED') { skipped++; continue }
 
-    const homeTeam = [str(row[8]), str(row[9])].filter(Boolean).join(' ').slice(0, 4)
-    const awayTeam = [str(row[10]), str(row[11])].filter(Boolean).join(' ').slice(0, 4)
+    const homeClub = str(row[8])
+    const awayClub = str(row[10])
+    const homeSuffix = str(row[9]).match(/-(\d+)$/)?.[1] ?? ''
+    const awaySuffix = str(row[11]).match(/-(\d+)$/)?.[1] ?? ''
+    const homeTeam = homeClub + homeSuffix
+    const awayTeam = awayClub + awaySuffix
     if (!homeTeam && !awayTeam) { skipped++; continue }
 
     const competition  = get(row, C.competition)
@@ -183,6 +188,7 @@ export function parseExcelFixtures(buffer) {
       competition,
       age_group:           ageGroup,
       venue:               get(row, C.venue),
+      field:               get(row, C.field),
       home_team:           homeTeam,
       away_team:           awayTeam,
       referee:             get(row, C.referee),

@@ -52,6 +52,7 @@ const MATCH_SETUPS_SCHEMA = [
   f('home_colour',         'text'),
   f('away_colour',         'text'),
   f('venue',               'text'),
+  f('field',               'text'),
   f('kickoff_date',        'text'),
   f('kickoff_time',        'text'),
   f('ical_uid',            'text'),

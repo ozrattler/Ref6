@@ -76,7 +76,7 @@ fun MatchSetupListScreen(
                             )
                             if (setup.kickoffTime.isNotBlank()) {
                                 Text(
-                                    text = setup.kickoffTime,
+                                    text = formatTime12h(setup.kickoffTime),
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 13.sp,
                                     color = Color.White

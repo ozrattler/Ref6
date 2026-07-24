@@ -7,6 +7,15 @@ import { useAuth } from '../lib/auth'
 
 const AEST = { timeZone: 'Australia/Sydney' }
 
+function formatTime12h(hhmm) {
+  if (!hhmm) return ''
+  const [h, m] = hhmm.split(':').map(Number)
+  if (isNaN(h) || isNaN(m)) return hhmm
+  const period = h < 12 ? 'AM' : 'PM'
+  const hour = h % 12 || 12
+  return `${hour}:${String(m).padStart(2, '0')}${period}`
+}
+
 function formatDayHeader(dateStr) {
   if (!dateStr) return 'Unknown date'
   try {
@@ -459,7 +468,7 @@ function FixtureCard({ fixture: f, onClick, isAdmin, onDelete }) {
         {f.competition && <span className="fixture-competition">{f.competition}</span>}
         {f.age_group && <span className="badge">{f.age_group}</span>}
         {cd && <span className={`fixture-countdown ${cd.cls}`}>{cd.label}</span>}
-        {f.kickoff_time && <span className="fixture-kotime">{f.kickoff_time}</span>}
+        {f.kickoff_time && <span className="fixture-kotime">{formatTime12h(f.kickoff_time)}</span>}
       </div>
       <div className="fixture-teams">
         <div className="fixture-team-block">
