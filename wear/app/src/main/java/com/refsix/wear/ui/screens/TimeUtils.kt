@@ -1,5 +1,16 @@
 package com.refsix.wear.ui.screens
 
+import java.text.SimpleDateFormat
+import java.util.Locale
+
+fun kickoffDayAbbrev(dateStr: String): String {
+    if (dateStr.isBlank()) return ""
+    return try {
+        val date = SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(dateStr) ?: return ""
+        SimpleDateFormat("EEE", Locale.US).format(date).uppercase(Locale.US)
+    } catch (_: Exception) { "" }
+}
+
 fun formatTime12h(hhmm: String): String {
     if (hhmm.isBlank()) return hhmm
     val parts = hhmm.split(":")

@@ -31,7 +31,8 @@ data class MatchSetupData(
     val kickoffDate: String = "",
     val kickoffTime: String = "",
     val homeColour: String = "",  // hex e.g. "#FF0000"
-    val awayColour: String = ""
+    val awayColour: String = "",
+    val field: String = ""        // specific pitch name, e.g. "Ridge 5"
 )
 
 class PocketBaseSync(private val context: Context) {
@@ -121,7 +122,8 @@ class PocketBaseSync(private val context: Context) {
                     kickoffDate = item.optString("kickoff_date", ""),
                     kickoffTime = item.optString("kickoff_time", ""),
                     homeColour = item.optString("home_colour", ""),
-                    awayColour = item.optString("away_colour", "")
+                    awayColour = item.optString("away_colour", ""),
+                    field = item.optString("field", "")
                 )
             }
         } catch (e: Exception) {

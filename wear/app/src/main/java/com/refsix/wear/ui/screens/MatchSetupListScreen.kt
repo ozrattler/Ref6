@@ -24,6 +24,14 @@ fun MatchSetupListScreen(
     val setups by viewModel.pendingSetups.collectAsState()
     val isFetching by viewModel.isFetchingSetups.collectAsState()
 
+    // Sort ascending by date then time so earliest kickoff appears first.
+    val sortedSetups = remember(setups) {
+        setups.sortedWith(compareBy(
+            { it.kickoffDate.ifBlank { "9999-99-99" } },
+            { parseKickoffMinutes(it.kickoffTime) }
+        ))
+    }
+
     LaunchedEffect(Unit) { viewModel.refreshPendingSetup() }
 
     ScalingLazyColumn(
@@ -50,7 +58,7 @@ fun MatchSetupListScreen(
                 )
             }
 
-            setups.isEmpty() -> item {
+            sortedSetups.isEmpty() -> item {
                 Text(
                     text = "No setups available",
                     style = MaterialTheme.typography.body2,
@@ -58,56 +66,63 @@ fun MatchSetupListScreen(
                 )
             }
 
-            else -> items(setups.size) { i ->
-                val setup = setups[i]
-                val hasGrade = setup.gradeCode.isNotBlank()
-                val hasCompetition = setup.competition.isNotBlank()
+            else -> items(sortedSetups.size) { i ->
+                val setup = sortedSetups[i]
+
+                val day   = kickoffDayAbbrev(setup.kickoffDate)
+                val field = setup.field
+                val grade = setup.gradeCode
+                val time  = formatTime12h(setup.kickoffTime)
+
+                // Build text segments around the grade badge:
+                //   preGradeText  → [badge] → postGradeText
+                // e.g. "SUN · Ridge 5 · "  [AM04]  " · 11:40AM"
+                val preGradeParts = listOf(day, field).filter { it.isNotBlank() }
+                val preGradeText = when {
+                    preGradeParts.isEmpty() -> ""
+                    grade.isNotBlank() || time.isNotBlank() ->
+                        preGradeParts.joinToString(" · ") + " · "
+                    else -> preGradeParts.joinToString(" · ")
+                }
+                val postGradeText = when {
+                    time.isBlank()          -> ""
+                    grade.isNotBlank()      -> " · $time"
+                    else                    -> time
+                }
+                val hasSecondaryLabel =
+                    preGradeText.isNotBlank() || grade.isNotBlank() || postGradeText.isNotBlank()
+
                 Chip(
                     label = {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "${setup.homeTeam.ifBlank { "?" }} vs ${setup.awayTeam.ifBlank { "?" }}",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 13.sp,
-                                modifier = Modifier.weight(1f)
-                            )
-                            if (setup.kickoffTime.isNotBlank()) {
-                                Text(
-                                    text = formatTime12h(setup.kickoffTime),
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 13.sp,
-                                    color = Color.White
-                                )
-                            }
-                        }
+                        Text(
+                            text = "${setup.homeTeam.ifBlank { "?" }} vs ${setup.awayTeam.ifBlank { "?" }}",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                            modifier = Modifier.fillMaxWidth()
+                        )
                     },
-                    secondaryLabel = if (hasGrade || hasCompetition) {
+                    secondaryLabel = if (hasSecondaryLabel) {
                         {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                if (hasGrade) {
+                                if (preGradeText.isNotBlank()) {
+                                    Text(preGradeText, fontSize = 10.sp, color = Color.LightGray)
+                                }
+                                if (grade.isNotBlank()) {
                                     Box(
                                         modifier = Modifier
                                             .background(Color(0xFF2E7D32), RoundedCornerShape(4.dp))
                                             .padding(horizontal = 5.dp, vertical = 1.dp)
                                     ) {
                                         Text(
-                                            text = setup.gradeCode,
+                                            text = grade,
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 10.sp,
                                             color = Color.White
                                         )
                                     }
-                                    if (hasCompetition) Spacer(Modifier.width(5.dp))
                                 }
-                                if (hasCompetition) {
-                                    Text(
-                                        text = setup.competition,
-                                        fontSize = 10.sp,
-                                        color = Color.LightGray
-                                    )
+                                if (postGradeText.isNotBlank()) {
+                                    Text(postGradeText, fontSize = 10.sp, color = Color.LightGray)
                                 }
                             }
                         }
@@ -132,4 +147,21 @@ fun MatchSetupListScreen(
             )
         }
     }
+}
+
+// Returns minutes since midnight for sort ordering; unparseable times sort last.
+private fun parseKickoffMinutes(timeStr: String): Int {
+    if (timeStr.isBlank()) return Int.MAX_VALUE
+    return try {
+        val upper = timeStr.trim().uppercase()
+        val isPm = upper.contains("PM")
+        val isAm = upper.contains("AM")
+        val digits = upper.replace("AM", "").replace("PM", "").trim()
+        val parts = digits.split(":")
+        var h = parts[0].trim().toInt()
+        val m = parts.getOrNull(1)?.trim()?.toInt() ?: 0
+        if (isPm && h != 12) h += 12
+        if (isAm && h == 12) h = 0
+        h * 60 + m
+    } catch (_: Exception) { Int.MAX_VALUE }
 }
