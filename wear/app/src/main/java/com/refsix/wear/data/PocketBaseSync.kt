@@ -132,7 +132,8 @@ class PocketBaseSync(private val context: Context) {
         }
     }
 
-    // Returns the PocketBase record ID on success, null on failure.
+    // Returns the PocketBase record ID on success, null on any failure.
+    // A non-null return guarantees HTTP 2xx was received for the match record.
     suspend fun syncMatch(match: SavedMatch): String? = withContext(Dispatchers.IO) {
         Log.i(TAG, "syncMatch: START ${match.homeTeam} vs ${match.awayTeam} status=${match.status} setupId=${match.matchSetupId}")
         Log.i(TAG, "syncMatch: baseUrl=$baseUrl networkAvailable=${isNetworkAvailable()}")
@@ -158,10 +159,13 @@ class PocketBaseSync(private val context: Context) {
                     put("max_heart_rate", match.maxHeartRate)
                 }
             }
-            Log.i(TAG, "syncMatch: POST $baseUrl/matches/records body=$matchBody")
-            val pbMatchId = postJson("$baseUrl/matches/records", matchBody)
-                ?: return@withContext null
-            Log.i(TAG, "syncMatch: match created id=$pbMatchId, posting ${match.events.size} events")
+            Log.i(TAG, "syncMatch: POST $baseUrl/matches/records")
+            val (matchHttpCode, pbMatchId) = postJson("$baseUrl/matches/records", matchBody)
+            if (matchHttpCode !in 200..299 || pbMatchId == null) {
+                Log.e(TAG, "syncMatch: match POST failed HTTP $matchHttpCode id=$pbMatchId — local data preserved")
+                return@withContext null
+            }
+            Log.i(TAG, "syncMatch: match created HTTP $matchHttpCode id=$pbMatchId, posting ${match.events.size} events")
 
             match.events.forEach { event ->
                 val incidentBody = JSONObject().apply {
@@ -179,7 +183,10 @@ class PocketBaseSync(private val context: Context) {
                     event.lat?.let { put("latitude", it) }
                     event.lng?.let { put("longitude", it) }
                 }
-                postJson("$baseUrl/incidents/records", incidentBody)
+                val (incCode, _) = postJson("$baseUrl/incidents/records", incidentBody)
+                if (incCode !in 200..299) {
+                    Log.w(TAG, "syncMatch: incident POST failed HTTP $incCode (match $pbMatchId already saved)")
+                }
             }
 
             // Only now that sync succeeded, mark the originating setup as done.
@@ -229,10 +236,12 @@ class PocketBaseSync(private val context: Context) {
         else -> AgeGroup.OPEN_SENIOR
     }
 
-    private fun postJson(url: String, body: JSONObject): String? {
+    // Returns (httpCode, recordId). httpCode=0 means a network/IO exception occurred.
+    // recordId is non-null only when httpCode is 2xx and the response body contained "id".
+    private fun postJson(url: String, body: JSONObject): Pair<Int, String?> {
         Log.i(TAG, "postJson: POST $url")
         val conn = URL(url).openConnection() as HttpURLConnection
-        return try {
+        try {
             conn.requestMethod = "POST"
             conn.setRequestProperty("Content-Type", "application/json")
             conn.doOutput = true
@@ -241,16 +250,22 @@ class PocketBaseSync(private val context: Context) {
             OutputStreamWriter(conn.outputStream).use { it.write(body.toString()) }
             val code = conn.responseCode
             if (code !in 200..299) {
-                val errBody = conn.errorStream?.bufferedReader()?.readText()
-                Log.e(TAG, "postJson: HTTP $code url=$url body=$errBody")
-                return null
+                val errBody = runCatching { conn.errorStream?.bufferedReader()?.readText() }.getOrNull()
+                Log.e(TAG, "postJson: HTTP $code url=$url errBody=$errBody")
+                return Pair(code, null)
             }
             val responseText = conn.inputStream.bufferedReader().readText()
-            val id = JSONObject(responseText).getString("id")
-            Log.i(TAG, "postJson: HTTP $code created id=$id")
-            id
+            val id = runCatching { JSONObject(responseText).getString("id") }.getOrElse {
+                Log.e(TAG, "postJson: HTTP $code but failed to parse id from response: $responseText", it)
+                return Pair(code, null)
+            }
+            Log.i(TAG, "postJson: HTTP $code id=$id")
+            return Pair(code, id)
+        } catch (e: Exception) {
+            Log.e(TAG, "postJson: EXCEPTION ${e.javaClass.simpleName}: ${e.message}", e)
+            return Pair(0, null)
         } finally {
-            conn.disconnect()
+            runCatching { conn.disconnect() }
         }
     }
 }

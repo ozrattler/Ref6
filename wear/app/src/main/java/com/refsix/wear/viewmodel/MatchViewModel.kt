@@ -523,34 +523,41 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private suspend fun syncUnsyncedMatches() {
-        val unsynced = matchStorage.getUnsyncedMatches()
-        if (unsynced.isEmpty()) {
-            unregisterNetworkCallback()
-            return
-        }
-        if (!pocketBaseSync.isNetworkAvailable()) {
-            registerNetworkCallback()
-            return
-        }
-        var anySuccess = false
-        var anyFailed = false
-        unsynced.forEach { match ->
-            var pbId: String? = null
-            for (attempt in 1..3) {
-                pbId = pocketBaseSync.syncMatch(match)
-                if (pbId != null) break
-                if (attempt < 3) delay(3_000L)
+        try {
+            val unsynced = matchStorage.getUnsyncedMatches()
+            if (unsynced.isEmpty()) {
+                unregisterNetworkCallback()
+                return
             }
-            if (pbId != null) {
-                matchStorage.markSynced(match.id, pbId)
-                _savedMatches.value = matchStorage.loadMatches()
-                anySuccess = true
-            } else {
-                anyFailed = true
+            if (!pocketBaseSync.isNetworkAvailable()) {
+                registerNetworkCallback()
+                return
             }
+            var anySuccess = false
+            var anyFailed = false
+            unsynced.forEach { match ->
+                var pbId: String? = null
+                for (attempt in 1..3) {
+                    pbId = pocketBaseSync.syncMatch(match)
+                    if (pbId != null) break
+                    if (attempt < 3) delay(3_000L)
+                }
+                // Only mark synced when syncMatch confirms HTTP 2xx and returns a valid ID.
+                // Any failure (403, timeout, exception) leaves the match unsynced for retry.
+                if (pbId != null) {
+                    matchStorage.markSynced(match.id, pbId)
+                    _savedMatches.value = matchStorage.loadMatches()
+                    anySuccess = true
+                } else {
+                    Log.w("MatchViewModel", "syncUnsyncedMatches: match ${match.id} not synced — will retry")
+                    anyFailed = true
+                }
+            }
+            _syncResult.value = if (anyFailed) false else if (anySuccess) true else null
+            updateNetworkCallbackRegistration()
+        } catch (e: Exception) {
+            Log.e("MatchViewModel", "syncUnsyncedMatches: unexpected exception — local data preserved", e)
         }
-        _syncResult.value = if (anyFailed) false else if (anySuccess) true else null
-        updateNetworkCallbackRegistration()
     }
 
     fun refreshPendingSetup() {
