@@ -304,7 +304,7 @@ function GoalLine({ incident: i }) {
 
   return (
     <>
-      <span className="rpt-event-min">{i.minute}'</span>
+      <span className="rpt-event-min">{i.minute || '—'}'</span>
       <span className="rpt-event-player">{scorer || '—'}</span>
       {i.goal_type && <span className="rpt-event-meta">{i.goal_type}</span>}
     </>
@@ -314,7 +314,7 @@ function GoalLine({ incident: i }) {
 function CardLine({ incident: i }) {
   return (
     <>
-      <span className="rpt-event-min">{i.minute}'</span>
+      <span className="rpt-event-min">{i.minute || '—'}'</span>
       {i.player_number && <span className="rpt-event-player">#{i.player_number}</span>}
       {i.player_name   && <span className="rpt-event-player">{i.player_name}</span>}
       {i.offence_description && (
@@ -467,6 +467,15 @@ function OfficialItem({ role, name }) {
 
 const AEST = { timeZone: 'Australia/Sydney' }
 
+function formatTime12h(hhmm) {
+  if (!hhmm) return ''
+  const [h, m] = hhmm.split(':').map(Number)
+  if (isNaN(h) || isNaN(m)) return hhmm
+  const period = h < 12 ? 'AM' : 'PM'
+  const hour = h % 12 || 12
+  return `${hour}:${String(m).padStart(2, '0')}${period}`
+}
+
 function buildDateLabel(m) {
   const parts = []
   const fmt = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', ...AEST }
@@ -479,7 +488,7 @@ function buildDateLabel(m) {
       parts.push(new Date(m.date).toLocaleDateString('en-AU', fmt))
     } catch { parts.push(m.date) }
   }
-  if (m.kickoff_time) parts.push(`KO ${m.kickoff_time}`)
+  if (m.kickoff_time) parts.push(`KO ${formatTime12h(m.kickoff_time)}`)
   return parts.join(' · ') || null
 }
 
@@ -535,7 +544,7 @@ function EventCell({ incident: i, isAway, homeColour, awayColour }) {
         <EventIcon type={i.type} />
         <div className="tl-evt-min">
           <span className="kit-dot kit-dot-sm" style={{ background: kitColor }} />
-          {i.minute ?? '—'}'
+          {i.minute || '—'}'
         </div>
       </div>
     )
@@ -544,7 +553,7 @@ function EventCell({ incident: i, isAway, homeColour, awayColour }) {
   return (
     <div className="tl-evt">
       <div className="tl-evt-min">
-        {i.minute ?? '—'}'
+        {i.minute || '—'}'
         <span className="kit-dot kit-dot-sm" style={{ background: kitColor }} />
       </div>
       <EventIcon type={i.type} />
@@ -774,7 +783,7 @@ function IncidentsEditor({ matchId, incidents, setIncidents, homeTeam, awayTeam 
             {incTypeLabel(inc.type)}
           </span>
           <span className="inc-editor-info">
-            {inc.minute ? `${inc.minute}'` : ''}{' '}
+            {inc.minute || '—'}'{' '}
             {inc.team}{inc.player_number ? ` #${inc.player_number}` : ''}
             {inc.player_name ? ` ${inc.player_name}` : ''}
             {inc.offence_description ? ` — ${inc.offence_description}` : ''}
