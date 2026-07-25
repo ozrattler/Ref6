@@ -24,6 +24,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.activity.compose.BackHandler
 import androidx.navigation.NavController
 import androidx.wear.compose.material.*
 import com.refsix.wear.data.CardAlertType
@@ -35,6 +36,10 @@ import kotlinx.coroutines.delay
 
 @Composable
 fun MatchScreen(navController: NavController, viewModel: MatchViewModel) {
+    // Hardware back button is a dead key during a live match — back navigation
+    // must only happen through the explicit End Match control.
+    BackHandler(enabled = true) {}
+
     val state by viewModel.state.collectAsState()
     val sinBinAlert by viewModel.sinBinAlert.collectAsState()
     val pagerState = rememberPagerState(initialPage = 1) { 3 }

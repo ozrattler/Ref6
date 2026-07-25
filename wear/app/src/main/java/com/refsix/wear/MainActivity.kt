@@ -97,7 +97,8 @@ class MainActivity : ComponentActivity() {
                 // Track current route to disable swipe-to-dismiss on report screens
                 val backStack by navController.currentBackStack.collectAsState()
                 val currentRoute = backStack.lastOrNull()?.destination?.route
-                val swipeEnabled = currentRoute != "fullTime" &&
+                val swipeEnabled = currentRoute != "match" &&
+                    currentRoute != "fullTime" &&
                     currentRoute != "report/{index}" &&
                     currentRoute != "confirmEnd/{action}" &&
                     currentRoute != "cardConfirm"
