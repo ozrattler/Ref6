@@ -5,6 +5,10 @@ import android.app.Application
 import android.app.NotificationManager
 import android.content.pm.PackageManager
 import android.location.Location
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
@@ -103,6 +107,13 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
     private val _isFetchingSetups = MutableStateFlow(false)
     val isFetchingSetups: StateFlow<Boolean> = _isFetchingSetups.asStateFlow()
 
+    private val connectivityManager: ConnectivityManager? =
+        application.getSystemService(ConnectivityManager::class.java)
+    private var networkCallback: ConnectivityManager.NetworkCallback? = null
+
+    private val _syncResult = MutableStateFlow<Boolean?>(null)
+    val syncResult: StateFlow<Boolean?> = _syncResult.asStateFlow()
+
     // One-shot signal: SetupScreen watches this to apply local form fields after
     // returning from the list screen. Cleared by consumeAppliedSetup().
     private val _appliedSetup = MutableStateFlow<MatchSetupData?>(null)
@@ -112,6 +123,48 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
     val uiEvents: SharedFlow<MatchUiEvent> = _uiEvents.asSharedFlow()
 
     private var timerJob: Job? = null
+
+    fun clearSyncResult() { _syncResult.value = null }
+
+    fun syncNow() {
+        viewModelScope.launch { syncUnsyncedMatches() }
+    }
+
+    private fun updateNetworkCallbackRegistration() {
+        if (matchStorage.getUnsyncedMatches().isNotEmpty()) registerNetworkCallback()
+        else unregisterNetworkCallback()
+    }
+
+    private fun registerNetworkCallback() {
+        if (networkCallback != null) return
+        val cm = connectivityManager ?: return
+        val cb = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) {
+                viewModelScope.launch { syncUnsyncedMatches() }
+            }
+        }
+        networkCallback = cb
+        val request = NetworkRequest.Builder()
+            .addCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+            .build()
+        try {
+            cm.registerNetworkCallback(request, cb)
+        } catch (e: Exception) {
+            Log.w("MatchViewModel", "registerNetworkCallback failed", e)
+            networkCallback = null
+        }
+    }
+
+    private fun unregisterNetworkCallback() {
+        val cb = networkCallback ?: return
+        networkCallback = null
+        try { connectivityManager?.unregisterNetworkCallback(cb) } catch (_: Exception) {}
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        unregisterNetworkCallback()
+    }
 
     init {
         launchTimer()
@@ -126,6 +179,7 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
         refreshPendingSetup()
         observeRunningForGps()
         observeRunningForDnd()
+        updateNetworkCallbackRegistration()
     }
 
     private fun saveInProgress(htBreakStartMillis: Long = 0L) {
@@ -452,6 +506,7 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
         _hasResumableMatch.value = false
         matchStorage.saveMatch(_state.value)
         _savedMatches.value = matchStorage.loadMatches()
+        updateNetworkCallbackRegistration()
         viewModelScope.launch {
             _uiEvents.emit(MatchUiEvent.FullTimeAlert)
             syncUnsyncedMatches()
@@ -468,8 +523,18 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private suspend fun syncUnsyncedMatches() {
-        if (!pocketBaseSync.isNetworkAvailable()) return
-        matchStorage.getUnsyncedMatches().forEach { match ->
+        val unsynced = matchStorage.getUnsyncedMatches()
+        if (unsynced.isEmpty()) {
+            unregisterNetworkCallback()
+            return
+        }
+        if (!pocketBaseSync.isNetworkAvailable()) {
+            registerNetworkCallback()
+            return
+        }
+        var anySuccess = false
+        var anyFailed = false
+        unsynced.forEach { match ->
             var pbId: String? = null
             for (attempt in 1..3) {
                 pbId = pocketBaseSync.syncMatch(match)
@@ -479,8 +544,13 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
             if (pbId != null) {
                 matchStorage.markSynced(match.id, pbId)
                 _savedMatches.value = matchStorage.loadMatches()
+                anySuccess = true
+            } else {
+                anyFailed = true
             }
         }
+        _syncResult.value = if (anyFailed) false else if (anySuccess) true else null
+        updateNetworkCallbackRegistration()
     }
 
     fun refreshPendingSetup() {

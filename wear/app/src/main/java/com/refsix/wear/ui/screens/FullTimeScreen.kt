@@ -103,6 +103,7 @@ fun FullTimeScreen(viewModel: MatchViewModel, onNewMatch: () -> Unit) {
             Chip(
                 label = { Text("Done", fontWeight = FontWeight.Bold) },
                 onClick = {
+                    if (state.phase != MatchPhase.FULL_TIME) viewModel.callFullTime()
                     viewModel.resetMatch()
                     onNewMatch()
                 },

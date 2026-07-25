@@ -15,11 +15,23 @@ import com.refsix.wear.ui.theme.RefGreen
 import com.refsix.wear.viewmodel.MatchViewModel
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlinx.coroutines.delay
 
 @Composable
 fun MatchHistoryScreen(viewModel: MatchViewModel, navController: NavController) {
     val matches by viewModel.savedMatches.collectAsState()
+    val syncResult by viewModel.syncResult.collectAsState()
     val dateFormat = remember { SimpleDateFormat("d MMM yyyy", Locale.getDefault()) }
+    val unsyncedCount = remember(matches) { matches.count { it.pocketBaseId == null } }
+    var syncMessage by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(syncResult) {
+        val result = syncResult ?: return@LaunchedEffect
+        syncMessage = if (result) "Synced" else "Sync failed"
+        delay(3_000L)
+        syncMessage = null
+        viewModel.clearSyncResult()
+    }
 
     ScalingLazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -68,6 +80,26 @@ fun MatchHistoryScreen(viewModel: MatchViewModel, navController: NavController) 
 
             item {
                 Spacer(modifier = Modifier.height(4.dp))
+            }
+
+            if (unsyncedCount > 0) {
+                item {
+                    CompactChip(
+                        label = { Text("Sync ($unsyncedCount)", fontWeight = FontWeight.Bold) },
+                        onClick = { viewModel.syncNow() },
+                        colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF1A3A5C))
+                    )
+                }
+            }
+
+            if (syncMessage != null) {
+                item {
+                    Text(
+                        text = syncMessage!!,
+                        style = MaterialTheme.typography.caption1,
+                        color = if (syncMessage == "Synced") Color(0xFF81C784) else Color(0xFFEF9A9A)
+                    )
+                }
             }
 
             item {
