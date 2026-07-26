@@ -614,13 +614,16 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
 
     fun recordGoal(team: String, scorerNumber: String = "", scorerName: String = "", goalType: String = "") {
         val loc = lastLocation
+        val minute = _state.value.currentMatchMinute
+        val half = _state.value.currentHalf
+        Log.d("MatchViewModel", "recordGoal: team=$team minute=$minute half=$half")
         _state.update { s ->
             val isHome = team == s.homeTeam
             val event = MatchEvent(
                 type = EventType.GOAL,
                 team = team,
-                matchMinute = s.currentMatchMinute,
-                half = s.currentHalf,
+                matchMinute = minute,
+                half = half,
                 scorerNumber = scorerNumber,
                 scorerName = scorerName,
                 detail = goalType,
@@ -638,9 +641,10 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
 
     fun recordCard(team: String, playerNumber: String, cardType: CardType, offence: String) {
         val loc = lastLocation
+        val minute = _state.value.currentMatchMinute
+        val half = _state.value.currentHalf
+        Log.d("MatchViewModel", "recordCard: team=$team player=$playerNumber cardType=$cardType minute=$minute half=$half")
         _state.update { s ->
-            val minute = s.currentMatchMinute
-            val half = s.currentHalf
 
             val isSecondYellow = cardType == CardType.YELLOW &&
                 s.playerYellowCount(team, playerNumber) >= 1

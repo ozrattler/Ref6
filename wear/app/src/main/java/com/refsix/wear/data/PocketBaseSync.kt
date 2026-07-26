@@ -168,6 +168,7 @@ class PocketBaseSync(private val context: Context) {
             Log.i(TAG, "syncMatch: match created HTTP $matchHttpCode id=$pbMatchId, posting ${match.events.size} events")
 
             match.events.forEach { event ->
+                Log.d(TAG, "syncMatch: incident type=${event.type} half=${event.half} minute=${event.matchMinute}")
                 val incidentBody = JSONObject().apply {
                     put("match_id", pbMatchId)
                     put("half", event.half)
