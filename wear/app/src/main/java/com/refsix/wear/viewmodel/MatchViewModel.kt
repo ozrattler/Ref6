@@ -34,6 +34,8 @@ import com.refsix.wear.data.SinBinEntry
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -110,6 +112,7 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
     private val connectivityManager: ConnectivityManager? =
         application.getSystemService(ConnectivityManager::class.java)
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
+    private val syncMutex = Mutex()
 
     private val _syncResult = MutableStateFlow<Boolean?>(null)
     val syncResult: StateFlow<Boolean?> = _syncResult.asStateFlow()
@@ -529,40 +532,47 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private suspend fun syncUnsyncedMatches() {
-        try {
-            val unsynced = matchStorage.getUnsyncedMatches()
-            if (unsynced.isEmpty()) {
-                unregisterNetworkCallback()
-                return
-            }
-            if (!pocketBaseSync.isNetworkAvailable()) {
-                registerNetworkCallback()
-                return
-            }
-            var anySuccess = false
-            var anyFailed = false
-            unsynced.forEach { match ->
-                var pbId: String? = null
-                for (attempt in 1..3) {
-                    pbId = pocketBaseSync.syncMatch(match)
-                    if (pbId != null) break
-                    if (attempt < 3) delay(3_000L)
+        // Mutex ensures only one sync run executes at a time. Concurrent triggers
+        // (full-time coroutine, retry loop, NetworkCallback, manual button) all
+        // queue here; by the time the second caller acquires the lock the first
+        // has already called markSynced, so getUnsyncedMatches() returns empty
+        // and no duplicate POST is sent.
+        syncMutex.withLock {
+            try {
+                val unsynced = matchStorage.getUnsyncedMatches()
+                if (unsynced.isEmpty()) {
+                    unregisterNetworkCallback()
+                    return
                 }
-                // Only mark synced when syncMatch confirms HTTP 2xx and returns a valid ID.
-                // Any failure (403, timeout, exception) leaves the match unsynced for retry.
-                if (pbId != null) {
-                    matchStorage.markSynced(match.id, pbId)
-                    _savedMatches.value = matchStorage.loadMatches()
-                    anySuccess = true
-                } else {
-                    Log.w("MatchViewModel", "syncUnsyncedMatches: match ${match.id} not synced — will retry")
-                    anyFailed = true
+                if (!pocketBaseSync.isNetworkAvailable()) {
+                    registerNetworkCallback()
+                    return
                 }
+                var anySuccess = false
+                var anyFailed = false
+                unsynced.forEach { match ->
+                    var pbId: String? = null
+                    for (attempt in 1..3) {
+                        pbId = pocketBaseSync.syncMatch(match)
+                        if (pbId != null) break
+                        if (attempt < 3) delay(3_000L)
+                    }
+                    // Only mark synced when syncMatch confirms HTTP 2xx and returns a valid ID.
+                    // Any failure (403, timeout, exception) leaves the match unsynced for retry.
+                    if (pbId != null) {
+                        matchStorage.markSynced(match.id, pbId)
+                        _savedMatches.value = matchStorage.loadMatches()
+                        anySuccess = true
+                    } else {
+                        Log.w("MatchViewModel", "syncUnsyncedMatches: match ${match.id} not synced — will retry")
+                        anyFailed = true
+                    }
+                }
+                _syncResult.value = if (anyFailed) false else if (anySuccess) true else null
+                updateNetworkCallbackRegistration()
+            } catch (e: Exception) {
+                Log.e("MatchViewModel", "syncUnsyncedMatches: unexpected exception — local data preserved", e)
             }
-            _syncResult.value = if (anyFailed) false else if (anySuccess) true else null
-            updateNetworkCallbackRegistration()
-        } catch (e: Exception) {
-            Log.e("MatchViewModel", "syncUnsyncedMatches: unexpected exception — local data preserved", e)
         }
     }
 

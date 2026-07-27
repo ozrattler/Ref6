@@ -135,6 +135,10 @@ class PocketBaseSync(private val context: Context) {
     // Returns the PocketBase record ID on success, null on any failure.
     // A non-null return guarantees HTTP 2xx was received for the match record.
     suspend fun syncMatch(match: SavedMatch): String? = withContext(Dispatchers.IO) {
+        if (match.pocketBaseId != null) {
+            Log.i(TAG, "syncMatch: already synced id=${match.pocketBaseId} — skipping duplicate POST")
+            return@withContext match.pocketBaseId
+        }
         Log.i(TAG, "syncMatch: START ${match.homeTeam} vs ${match.awayTeam} status=${match.status} setupId=${match.matchSetupId}")
         Log.i(TAG, "syncMatch: baseUrl=$baseUrl networkAvailable=${isNetworkAvailable()}")
         try {
