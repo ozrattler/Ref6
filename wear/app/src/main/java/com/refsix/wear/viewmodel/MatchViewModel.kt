@@ -374,9 +374,13 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
                 } else 0f
             } else 0f
 
-            // GPS-reported speed: accept only readings ≤ 20 km/h.
+            // GPS-reported speed: accept only readings in the plausible range.
+            // Require two consecutive valid readings before recording max speed —
+            // a single Doppler spike followed by walking doesn't constitute a sprint.
             val validSpeed = rawSpeedMs.takeIf { it in 0.1f..MAX_PLAUSIBLE_SPEED_MS }
-            val newMax = if (validSpeed != null) maxOf(s.maxSpeedMs, validSpeed) else s.maxSpeedMs
+            val newMax = if (validSpeed != null && s.prevValidSpeedMs > 0f)
+                maxOf(s.maxSpeedMs, validSpeed)
+            else s.maxSpeedMs
             val newCount = if (validSpeed != null) s.validSpeedCount + 1 else s.validSpeedCount
             val newSum   = if (validSpeed != null) s.totalValidSpeedSum + validSpeed else s.totalValidSpeedSum
 
@@ -384,6 +388,7 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
                 gpsPoints = s.gpsPoints + newPoint,
                 totalDistanceMeters = s.totalDistanceMeters + distanceAdded,
                 maxSpeedMs = newMax,
+                prevValidSpeedMs = validSpeed ?: 0f,
                 validSpeedCount = newCount,
                 totalValidSpeedSum = newSum,
                 hasGpsFix = true
@@ -425,6 +430,7 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
                 gpsPoints = emptyList(),
                 totalDistanceMeters = 0f,
                 maxSpeedMs = 0f,
+                prevValidSpeedMs = 0f,
                 hasGpsFix = false,
                 validSpeedCount = 0,
                 totalValidSpeedSum = 0f,

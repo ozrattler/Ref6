@@ -108,14 +108,17 @@ export default function Trends() {
 
   // ── Distance ─────────────────────────────────────────────────────────────────
   const dists = matches.map(m => Number(m.total_distance_km)).filter(d => d > 0)
-  const totalDist = dists.reduce((s, d) => s + d, 0)
-  const avgDist   = dists.length ? totalDist / dists.length : 0
+  const totalDist    = dists.reduce((s, d) => s + d, 0)
+  const avgDist      = dists.length ? totalDist / dists.length : 0
+  const gpsCount     = dists.length
+  const noGpsCount   = n - gpsCount
 
   // ── Speed ────────────────────────────────────────────────────────────────────
-  const avgSpeeds = matches.map(m => Number(m.average_speed_kmh)).filter(s => s > 0)
-  const maxSpeeds = matches.map(m => Number(m.max_speed_kmh)).filter(s => s > 0)
-  const avgOfAvg  = avgSpeeds.length ? avgSpeeds.reduce((s, v) => s + v, 0) / avgSpeeds.length : 0
-  const maxOfMax  = maxSpeeds.length ? Math.max(...maxSpeeds) : 0
+  const avgSpeeds  = matches.map(m => Number(m.average_speed_kmh)).filter(s => s > 0)
+  const maxSpeeds  = matches.map(m => Number(m.max_speed_kmh)).filter(s => s > 0)
+  const avgOfAvg   = avgSpeeds.length ? avgSpeeds.reduce((s, v) => s + v, 0) / avgSpeeds.length : 0
+  const maxOfMax   = maxSpeeds.length ? Math.max(...maxSpeeds) : 0
+  const speedCount = avgSpeeds.length
 
   return (
     <div className="page">
@@ -217,20 +220,23 @@ export default function Trends() {
       {tab === 'Distance' && (
         <div className="rpt-section">
           <div className="rpt-section-label">Distance Covered</div>
-          {dists.length === 0 ? (
+          {gpsCount === 0 ? (
             <p className="tr-empty">No GPS distance data recorded yet.</p>
           ) : (
-            <div className="tr-stat-grid">
-              <StatCard
-                value={`${fmt1(totalDist)} km`}
-                label="Total Distance"
-                sub={`across ${dists.length} match${dists.length !== 1 ? 'es' : ''} with GPS`}
-              />
-              <StatCard
-                value={`${fmt1(avgDist)} km`}
-                label="Avg per Match"
-              />
-            </div>
+            <>
+              <div className="tr-stat-grid">
+                <StatCard
+                  value={`${fmt1(totalDist)} km`}
+                  label="Total Distance"
+                  sub={`${gpsCount} match${gpsCount !== 1 ? 'es' : ''} with GPS`}
+                />
+                <StatCard
+                  value={`${fmt1(avgDist)} km`}
+                  label="Avg per Match"
+                  sub={noGpsCount > 0 ? `GPS only · ${noGpsCount} without excluded` : 'GPS matches'}
+                />
+              </div>
+            </>
           )}
         </div>
       )}
@@ -238,19 +244,19 @@ export default function Trends() {
       {tab === 'Speed' && (
         <div className="rpt-section">
           <div className="rpt-section-label">Speed</div>
-          {avgSpeeds.length === 0 ? (
+          {speedCount === 0 ? (
             <p className="tr-empty">No GPS speed data recorded yet.</p>
           ) : (
             <div className="tr-stat-grid">
               <StatCard
                 value={`${fmt1(avgOfAvg)} km/h`}
                 label="Avg Speed"
-                sub="average of match averages"
+                sub={`${speedCount} of ${n} match${n !== 1 ? 'es' : ''} with GPS${n - speedCount > 0 ? ` · ${n - speedCount} excluded` : ''}`}
               />
               <StatCard
                 value={`${fmt1(maxOfMax)} km/h`}
                 label="Top Speed"
-                sub="fastest recorded"
+                sub="GPS matches only"
               />
             </div>
           )}

@@ -89,6 +89,7 @@ data class MatchState(
     val gpsPoints: List<GpsPoint> = emptyList(),
     val totalDistanceMeters: Float = 0f,
     val maxSpeedMs: Float = 0f,
+    val prevValidSpeedMs: Float = 0f,  // previous reading for consecutive-spike rejection
     val hasGpsFix: Boolean = false,
     val validSpeedCount: Int = 0,
     val totalValidSpeedSum: Float = 0f,
