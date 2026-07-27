@@ -76,26 +76,46 @@ export default function Fixtures() {
   const navigate = useNavigate()
   const { isAdmin } = useAuth()
 
-  const loadFixtures = useCallback(() => {
-    pb.collection('match_setups')
-      .getList(1, 500, { requestKey: null })
-      .then(r => {
-        const pending = r.items
-          .filter(f => !f.status || f.status === 'pending')
-          .sort((a, b) => {
-            const da = (a.kickoff_date || '9999-12-31') + 'T' + (a.kickoff_time || '00:00')
-            const db = (b.kickoff_date || '9999-12-31') + 'T' + (b.kickoff_time || '00:00')
-            return da.localeCompare(db)
+  const loadFixtures = useCallback(async () => {
+    try {
+      const r = await pb.collection('match_setups').getList(1, 500, { requestKey: null })
+
+      const pending = r.items
+        .filter(f => !f.status || f.status === 'pending')
+        .sort((a, b) => {
+          const da = (a.kickoff_date || '9999-12-31') + 'T' + (a.kickoff_time || '00:00')
+          const db = (b.kickoff_date || '9999-12-31') + 'T' + (b.kickoff_time || '00:00')
+          return da.localeCompare(db)
+        })
+      const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+      const loaded = r.items
+        .filter(f => f.status === 'loaded' && new Date(f.updated) >= cutoff)
+        .sort((a, b) => b.updated?.localeCompare(a.updated ?? '') ?? 0)
+
+      // Hide fixtures that already have a recorded match (display filter only — no data is modified).
+      let visiblePending = pending
+      if (pending.length > 0) {
+        try {
+          const filter = pending.map(f => `match_setup_id = "${f.id}"`).join(' || ')
+          const played = await pb.collection('matches').getList(1, pending.length, {
+            filter,
+            fields: 'match_setup_id',
+            requestKey: null,
           })
-        const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-        const loaded = r.items
-          .filter(f => f.status === 'loaded' && new Date(f.updated) >= cutoff)
-          .sort((a, b) => b.updated?.localeCompare(a.updated ?? '') ?? 0)
-        setFixtures(pending)
-        setLoadedSetups(loaded)
-        setLoading(false)
-      })
-      .catch(e => { setError(e.message); setLoading(false) })
+          const playedIds = new Set(played.items.map(m => m.match_setup_id))
+          visiblePending = pending.filter(f => !playedIds.has(f.id))
+        } catch {
+          // On network error, show all pending — safe default, never hides incorrectly.
+        }
+      }
+
+      setFixtures(visiblePending)
+      setLoadedSetups(loaded)
+      setLoading(false)
+    } catch (e) {
+      setError(e.message)
+      setLoading(false)
+    }
   }, [])
 
   const toggle = id => setSelected(prev => {
