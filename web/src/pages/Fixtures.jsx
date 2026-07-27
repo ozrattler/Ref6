@@ -109,13 +109,40 @@ export default function Fixtures() {
     allSelected ? new Set() : new Set(fixtures.map(f => f.id))
   )
 
+  async function hasLinkedMatch(id) {
+    try {
+      const r = await pb.collection('matches').getList(1, 1, {
+        filter: `match_setup_id = "${id}"`,
+        requestKey: null,
+      })
+      return r.totalItems > 0
+    } catch {
+      return false  // on error, allow the user-facing guard to proceed
+    }
+  }
+
   async function handleDeleteSelected() {
+    const ids = [...selected]
+    // Guard: refuse if any selected setup has a recorded match.
+    // Check all IDs in one query.
+    try {
+      const filter = ids.map(id => `match_setup_id = "${id}"`).join(' || ')
+      const r = await pb.collection('matches').getList(1, 1, { filter, requestKey: null })
+      if (r.totalItems > 0) {
+        window.alert(
+          'One or more selected fixtures have a recorded match in Match History and cannot be deleted.\n' +
+          'Deselect those fixtures and try again. Played match records are never deleted from this screen.'
+        )
+        return
+      }
+    } catch { /* network error — proceed; per-delete guard below still applies */ }
+
     const count = selected.size
     if (!window.confirm(`Delete ${count} fixture(s)? This cannot be undone.`)) return
     setBulkDeleting(true)
     try {
-      const ids = [...selected]
       for (const id of ids) {
+        if (await hasLinkedMatch(id)) continue  // skip any that slipped through
         await pb.collection('match_setups').delete(id, { requestKey: null })
       }
       setFixtures(prev => prev.filter(f => !selected.has(f.id)))
@@ -128,6 +155,14 @@ export default function Fixtures() {
   }
 
   async function handleDeleteFixture(id) {
+    // Guard: refuse if a recorded match references this setup.
+    if (await hasLinkedMatch(id)) {
+      window.alert(
+        'This fixture has a recorded match in Match History and cannot be deleted.\n' +
+        'The match record and all its incidents are preserved.'
+      )
+      return
+    }
     if (!window.confirm('Delete this fixture? This cannot be undone.')) return
     try {
       await pb.collection('match_setups').delete(id, { requestKey: null })
@@ -149,6 +184,14 @@ export default function Fixtures() {
   }
 
   async function handleDeleteLoaded(id) {
+    // Guard: refuse if a recorded match references this setup.
+    if (await hasLinkedMatch(id)) {
+      window.alert(
+        'This fixture has a recorded match in Match History and cannot be deleted.\n' +
+        'The match record and all its incidents are preserved.'
+      )
+      return
+    }
     if (!window.confirm('Permanently delete this record from PocketBase? This cannot be undone.')) return
     setDeleting(id)
     try {

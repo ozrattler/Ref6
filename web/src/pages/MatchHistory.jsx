@@ -1,17 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { pb } from '../lib/pb'
-import { useAuth } from '../lib/auth'
 
 export default function MatchHistory() {
   const [matches,  setMatches]  = useState([])
   const [cardMap,  setCardMap]  = useState(new Map())
   const [loading,  setLoading]  = useState(true)
   const [error,    setError]    = useState(null)
-  const [selected, setSelected] = useState(new Set())
-  const [deleting, setDeleting] = useState(false)
   const navigate = useNavigate()
-  const { isAdmin } = useAuth()
 
   useEffect(() => {
     let cancelled = false
@@ -43,47 +39,6 @@ export default function MatchHistory() {
     return () => { cancelled = true }
   }, [])
 
-  const toggle = id => setSelected(prev => {
-    const next = new Set(prev)
-    next.has(id) ? next.delete(id) : next.add(id)
-    return next
-  })
-
-  const allSelected = matches.length > 0 && selected.size === matches.length
-  const toggleAll   = () => setSelected(
-    allSelected ? new Set() : new Set(matches.map(m => m.id))
-  )
-
-  async function handleDelete() {
-    const count = selected.size
-    const noun  = count === 1 ? 'match' : 'matches'
-    if (!window.confirm(
-      `Delete ${count} ${noun} and all their incidents? This cannot be undone.`
-    )) return
-
-    setDeleting(true)
-    try {
-      const ids = [...selected]
-
-      // Delete all incidents for selected matches
-      const filter = ids.map(id => `match_id = "${id}"`).join(' || ')
-      const incRes = await pb.collection('incidents')
-        .getList(1, 5000, { filter, requestKey: null })
-        .catch(() => ({ items: [] }))
-      await Promise.all(incRes.items.map(inc => pb.collection('incidents').delete(inc.id)))
-
-      // Delete the matches (PocketBase cascadeDelete also handles any remaining incidents)
-      await Promise.all(ids.map(id => pb.collection('matches').delete(id)))
-
-      setMatches(prev => prev.filter(m => !selected.has(m.id)))
-      setSelected(new Set())
-    } catch (err) {
-      window.alert(`Delete failed: ${err.message}`)
-    } finally {
-      setDeleting(false)
-    }
-  }
-
   if (loading) return <div className="loading">Loading matches…</div>
 
   if (error) return (
@@ -107,47 +62,15 @@ export default function MatchHistory() {
 
   return (
     <div className="page">
-      <div className="mh-header">
-        <h1 className="page-title" style={{ margin: 0 }}>Match History</h1>
-        {isAdmin && (
-          <div className="mh-toolbar">
-            <label className="mh-select-all">
-              <input
-                type="checkbox"
-                className="mh-checkbox"
-                checked={allSelected}
-                onChange={toggleAll}
-              />
-              <span>{allSelected ? 'Deselect All' : 'Select All'}</span>
-            </label>
-            {selected.size > 0 && (
-              <button className="btn-danger-sm" onClick={handleDelete} disabled={deleting}>
-                {deleting ? 'Deleting…' : `Delete ${selected.size}`}
-              </button>
-            )}
-          </div>
-        )}
-      </div>
-
+      <h1 className="page-title">Match History</h1>
       <div className="match-list">
         {matches.map(m => (
-          <div key={m.id} className={isAdmin ? 'mc2-wrap' : undefined}>
-            {isAdmin && (
-              <label className="mc2-check-area">
-                <input
-                  type="checkbox"
-                  className="mh-checkbox"
-                  checked={selected.has(m.id)}
-                  onChange={() => toggle(m.id)}
-                />
-              </label>
-            )}
-            <MatchCard
-              match={m}
-              cards={cardMap.get(m.id) || { yc: 0, rc: 0 }}
-              onClick={() => navigate(`/match/${m.id}`)}
-            />
-          </div>
+          <MatchCard
+            key={m.id}
+            match={m}
+            cards={cardMap.get(m.id) || { yc: 0, rc: 0 }}
+            onClick={() => navigate(`/match/${m.id}`)}
+          />
         ))}
       </div>
     </div>
@@ -155,6 +78,15 @@ export default function MatchHistory() {
 }
 
 const AEST = { timeZone: 'Australia/Sydney' }
+
+function formatTime12h(hhmm) {
+  if (!hhmm) return ''
+  const [h, m] = hhmm.split(':').map(Number)
+  if (isNaN(h) || isNaN(m)) return hhmm
+  const period = h < 12 ? 'AM' : 'PM'
+  const hour = h % 12 || 12
+  return `${hour}:${String(m).padStart(2, '0')}${period}`
+}
 
 function MatchCard({ match: m, cards, onClick }) {
   let day = '—', mon = ''
@@ -188,7 +120,7 @@ function MatchCard({ match: m, cards, onClick }) {
           </div>
 
           <div className="mc2-centre">
-            {m.kickoff_time && <div className="mc2-kotime">{m.kickoff_time}</div>}
+            {m.kickoff_time && <div className="mc2-kotime">{formatTime12h(m.kickoff_time)}</div>}
             <div className="mc2-score">{m.final_score || '—'}</div>
             {m.venue && <div className="mc2-venue">{m.venue}</div>}
           </div>
