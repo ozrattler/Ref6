@@ -260,11 +260,12 @@ private fun MainMatchPage(
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = "-%02d:%02d".format(remaining / 60, remaining % 60),
-                        fontSize = 16.sp,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
                         color = when {
                             remaining <= 60 -> RefRed
                             remaining <= 120 -> RefYellow
-                            else -> Color.Gray
+                            else -> Color.White
                         }
                     )
                 }
