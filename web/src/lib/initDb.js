@@ -31,6 +31,7 @@ const MATCHES_SCHEMA = [
   f('average_speed_kmh', 'number'),
   f('max_speed_kmh',     'number'),
   f('match_setup_id',    'text'),
+  f('deleted',           'bool'),
 ]
 
 const MATCH_SETUPS_SCHEMA = [
