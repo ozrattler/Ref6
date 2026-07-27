@@ -1441,10 +1441,9 @@ body {
 .mh-edit-btn:hover,
 .mh-edit-btn.active { background: var(--accent); color: #000; }
 .mh-delete-bar {
-  margin-top: 14px;
+  margin-bottom: 14px;
   display: flex;
   justify-content: center;
-  padding-bottom: 8px;
 }
 .mh-checkbox {
   width: 16px;

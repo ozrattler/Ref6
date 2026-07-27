@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { pb } from '../lib/pb'
 
-const TABS = ['History', 'Trash']
+const TABS = ['History', 'Bin']
 
 const AEST = { timeZone: 'Australia/Sydney' }
 
@@ -31,12 +31,12 @@ export default function MatchHistory() {
     let cancelled = false
     setLoading(true)
     setError(null)
-    const isTrash = tab === 'Trash'
-    const filter = isTrash
+    const isBin = tab === 'Bin'
+    const filter = isBin
       ? 'status = "completed" && deleted = true'
       : 'status = "completed" && deleted != true'
 
-    const cardsFetch = isTrash
+    const cardsFetch = isBin
       ? Promise.resolve({ items: [] })
       : pb.collection('incidents').getList(1, 2000, {
           filter: '(type = "YELLOW_CARD" || type = "RED_CARD")',
@@ -82,7 +82,7 @@ export default function MatchHistory() {
   async function handleSoftDelete() {
     if (!selected.size) return
     const n = selected.size
-    if (!window.confirm(`Move ${n} match${n !== 1 ? 'es' : ''} to Trash?`)) return
+    if (!window.confirm(`Move ${n} match${n !== 1 ? 'es' : ''} to Bin?`)) return
     setBusy(true)
     try {
       await Promise.all([...selected].map(id => pb.collection('matches').update(id, { deleted: true })))
@@ -123,7 +123,7 @@ export default function MatchHistory() {
   }
 
   const isHistory = tab === 'History'
-  const isTrash   = tab === 'Trash'
+  const isBin     = tab === 'Bin'
 
   return (
     <div className="page">
@@ -169,6 +169,17 @@ export default function MatchHistory() {
           </div>
         ) : (
           <>
+            {deleteMode && (
+              <div className="mh-delete-bar">
+                <button
+                  className="btn-danger-sm"
+                  disabled={selected.size === 0 || busy}
+                  onClick={handleSoftDelete}
+                >
+                  {selected.size > 0 ? `Move to Bin (${selected.size})` : 'Move to Bin'}
+                </button>
+              </div>
+            )}
             <div className="match-list">
               {matches.map(m =>
                 deleteMode ? (
@@ -198,26 +209,15 @@ export default function MatchHistory() {
                 )
               )}
             </div>
-            {deleteMode && (
-              <div className="mh-delete-bar">
-                <button
-                  className="btn-danger-sm"
-                  disabled={selected.size === 0 || busy}
-                  onClick={handleSoftDelete}
-                >
-                  {selected.size > 0 ? `Move to Trash (${selected.size})` : 'Move to Trash'}
-                </button>
-              </div>
-            )}
           </>
         )
       )}
 
-      {!loading && !error && isTrash && (
+      {!loading && !error && isBin && (
         matches.length === 0 ? (
           <div className="empty-state">
             <div className="empty-icon">🗑️</div>
-            <div>Trash is empty</div>
+            <div>Bin is empty</div>
             <div className="empty-hint">Soft-deleted matches appear here and can be restored.</div>
           </div>
         ) : (
