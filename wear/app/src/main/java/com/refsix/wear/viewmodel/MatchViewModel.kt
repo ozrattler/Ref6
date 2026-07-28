@@ -612,7 +612,11 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
                 kickoffDate = setup.kickoffDate,
                 kickoffTime = setup.kickoffTime,
                 homeColour = setup.homeColour,
-                awayColour = setup.awayColour
+                awayColour = setup.awayColour,
+                referee = setup.referee,
+                ar1 = setup.ar1,
+                ar2 = setup.ar2,
+                fourthOfficial = setup.fourthOfficial
             )
         }
     }

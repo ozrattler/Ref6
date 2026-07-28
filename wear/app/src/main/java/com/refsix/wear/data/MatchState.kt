@@ -85,6 +85,10 @@ data class MatchState(
     val matchSetupId: String? = null,
     val kickoffDate: String = "",
     val kickoffTime: String = "",
+    val referee: String = "",
+    val ar1: String = "",
+    val ar2: String = "",
+    val fourthOfficial: String = "",
     // GPS tracking
     val gpsPoints: List<GpsPoint> = emptyList(),
     val totalDistanceMeters: Float = 0f,

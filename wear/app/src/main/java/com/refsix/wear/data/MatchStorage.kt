@@ -52,6 +52,10 @@ class MatchStorage(context: Context) {
             put("matchSetupId", state.matchSetupId ?: "")
             put("kickoffDate", state.kickoffDate)
             put("kickoffTime", state.kickoffTime)
+            if (state.referee.isNotEmpty())        put("referee",         state.referee)
+            if (state.ar1.isNotEmpty())            put("ar1",             state.ar1)
+            if (state.ar2.isNotEmpty())            put("ar2",             state.ar2)
+            if (state.fourthOfficial.isNotEmpty()) put("fourthOfficial",  state.fourthOfficial)
             put("totalDistanceMeters", state.totalDistanceMeters.toDouble())
             put("maxSpeedMs", state.maxSpeedMs.toDouble())
             put("validSpeedCount", state.validSpeedCount)
@@ -157,6 +161,10 @@ class MatchStorage(context: Context) {
             matchSetupId = obj.getString("matchSetupId").ifEmpty { null },
             kickoffDate = obj.getString("kickoffDate"),
             kickoffTime = obj.getString("kickoffTime"),
+            referee = obj.optString("referee", ""),
+            ar1 = obj.optString("ar1", ""),
+            ar2 = obj.optString("ar2", ""),
+            fourthOfficial = obj.optString("fourthOfficial", ""),
             totalDistanceMeters = obj.getDouble("totalDistanceMeters").toFloat(),
             maxSpeedMs = obj.getDouble("maxSpeedMs").toFloat(),
             validSpeedCount = obj.getInt("validSpeedCount"),
@@ -190,7 +198,11 @@ class MatchStorage(context: Context) {
             events = state.events,
             matchSetupId = state.matchSetupId,
             kickoffDate = state.kickoffDate,
-            kickoffTime = state.kickoffTime
+            kickoffTime = state.kickoffTime,
+            referee = state.referee,
+            ar1 = state.ar1,
+            ar2 = state.ar2,
+            fourthOfficial = state.fourthOfficial
         )
         val existing = loadMatches().toMutableList()
         existing.add(0, match)

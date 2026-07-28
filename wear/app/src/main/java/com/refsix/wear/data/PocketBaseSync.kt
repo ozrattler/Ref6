@@ -32,7 +32,11 @@ data class MatchSetupData(
     val kickoffTime: String = "",
     val homeColour: String = "",  // hex e.g. "#FF0000"
     val awayColour: String = "",
-    val field: String = ""        // specific pitch name, e.g. "Ridge 5"
+    val field: String = "",       // specific pitch name, e.g. "Ridge 5"
+    val referee: String = "",
+    val ar1: String = "",
+    val ar2: String = "",
+    val fourthOfficial: String = ""
 )
 
 class PocketBaseSync(private val context: Context) {
@@ -123,7 +127,11 @@ class PocketBaseSync(private val context: Context) {
                     kickoffTime = item.optString("kickoff_time", ""),
                     homeColour = item.optString("home_colour", ""),
                     awayColour = item.optString("away_colour", ""),
-                    field = item.optString("field", "")
+                    field = item.optString("field", ""),
+                    referee = item.optString("referee", ""),
+                    ar1 = item.optString("ar1", ""),
+                    ar2 = item.optString("ar2", ""),
+                    fourthOfficial = item.optString("fourth_official", "")
                 )
             }
         } catch (e: Exception) {
@@ -162,6 +170,10 @@ class PocketBaseSync(private val context: Context) {
                     put("avg_heart_rate", match.avgHeartRate)
                     put("max_heart_rate", match.maxHeartRate)
                 }
+                if (match.referee.isNotEmpty())       put("referee",         match.referee)
+                if (match.ar1.isNotEmpty())           put("ar1",             match.ar1)
+                if (match.ar2.isNotEmpty())           put("ar2",             match.ar2)
+                if (match.fourthOfficial.isNotEmpty()) put("fourth_official", match.fourthOfficial)
             }
             Log.i(TAG, "syncMatch: POST $baseUrl/matches/records")
             val (matchHttpCode, pbMatchId) = postJson("$baseUrl/matches/records", matchBody)

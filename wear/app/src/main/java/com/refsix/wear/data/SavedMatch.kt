@@ -24,7 +24,11 @@ data class SavedMatch(
     val pocketBaseId: String? = null,
     val matchSetupId: String? = null,
     val kickoffDate: String = "",
-    val kickoffTime: String = ""
+    val kickoffTime: String = "",
+    val referee: String = "",
+    val ar1: String = "",
+    val ar2: String = "",
+    val fourthOfficial: String = ""
 ) {
     fun toJson(): String = JSONObject().apply {
         put("id", id)
@@ -47,6 +51,10 @@ data class SavedMatch(
         matchSetupId?.let { put("matchSetupId", it) }
         if (kickoffDate.isNotEmpty()) put("kickoffDate", kickoffDate)
         if (kickoffTime.isNotEmpty()) put("kickoffTime", kickoffTime)
+        if (referee.isNotEmpty())       put("referee",         referee)
+        if (ar1.isNotEmpty())           put("ar1",             ar1)
+        if (ar2.isNotEmpty())           put("ar2",             ar2)
+        if (fourthOfficial.isNotEmpty()) put("fourthOfficial",  fourthOfficial)
         put("events", JSONArray().apply {
             events.forEach { e ->
                 put(JSONObject().apply {
@@ -105,7 +113,11 @@ data class SavedMatch(
                 pocketBaseId = o.optString("pocketBaseId", "").takeIf { it.isNotEmpty() },
                 matchSetupId = o.optString("matchSetupId", "").takeIf { it.isNotEmpty() },
                 kickoffDate = o.optString("kickoffDate", ""),
-                kickoffTime = o.optString("kickoffTime", "")
+                kickoffTime = o.optString("kickoffTime", ""),
+                referee = o.optString("referee", ""),
+                ar1 = o.optString("ar1", ""),
+                ar2 = o.optString("ar2", ""),
+                fourthOfficial = o.optString("fourthOfficial", "")
             )
         }
     }
