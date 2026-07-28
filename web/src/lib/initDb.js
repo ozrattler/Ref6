@@ -2,7 +2,13 @@
 // All operations use the admin API directly (no PocketBase SDK) so they work
 // regardless of collection-level access rules.
 
-const COLLECTION_RULES = {
+// Public: unauthenticated read + write — required for watch sync (no auth on device).
+const PUBLIC_RULES = {
+  listRule: '', viewRule: '', createRule: '', updateRule: '', deleteRule: '',
+}
+
+// Read-only public: anyone can list/view, only admins can write.
+const READONLY_RULES = {
   listRule: '', viewRule: '', createRule: null, updateRule: null, deleteRule: null,
 }
 
@@ -134,7 +140,7 @@ async function getCollection(pbUrl, token, name) {
 
 // Creates a new collection or patches an existing one to add missing fields
 // and set public access rules. Returns { action:'created'|'updated', name }.
-async function ensureCollection(pbUrl, token, name, schema) {
+async function ensureCollection(pbUrl, token, name, schema, rules) {
   const headers = {
     'Content-Type': 'application/json',
     Authorization: `Bearer ${token}`,
@@ -145,14 +151,14 @@ async function ensureCollection(pbUrl, token, name, schema) {
     const res = await fetchWithTimeout(`${pbUrl}/api/collections`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ name, type: 'base', schema, ...COLLECTION_RULES }),
+      body: JSON.stringify({ name, type: 'base', schema, ...rules }),
     })
     const data = await res.json()
     if (!res.ok) throw new Error(data.message || `Failed to create "${name}"`)
     return { action: 'created', id: data.id }
   }
 
-  // Collection exists — find missing fields and ensure public rules
+  // Collection exists — find missing fields and enforce the correct rules
   const existingNames = new Set(
     (existing.schema ?? existing.fields ?? []).map(fld => fld.name)
   )
@@ -164,7 +170,7 @@ async function ensureCollection(pbUrl, token, name, schema) {
     headers,
     body: JSON.stringify({
       schema: [...currentSchema, ...missing],
-      ...COLLECTION_RULES,
+      ...rules,
     }),
   })
   const data = await res.json()
@@ -183,31 +189,31 @@ export async function initDb(pbUrl, email, password) {
   const token = await adminAuth(url, email, password)
   log.push('✓ Authenticated as admin')
 
-  // matches
-  const mRes = await ensureCollection(url, token, 'matches', MATCHES_SCHEMA)
+  // matches — fully public so the watch can sync unauthenticated
+  const mRes = await ensureCollection(url, token, 'matches', MATCHES_SCHEMA, PUBLIC_RULES)
   log.push(mRes.action === 'created'
     ? '✓ Created matches collection'
     : `✓ Updated matches (${mRes.added} field${mRes.added !== 1 ? 's' : ''} added)`)
 
-  // incidents (relation depends on matches id)
-  const iRes = await ensureCollection(url, token, 'incidents', incidentsSchema(mRes.id))
+  // incidents — fully public (relation to matches; watch posts unauthenticated)
+  const iRes = await ensureCollection(url, token, 'incidents', incidentsSchema(mRes.id), PUBLIC_RULES)
   log.push(iRes.action === 'created'
     ? '✓ Created incidents collection'
     : `✓ Updated incidents (${iRes.added} field${iRes.added !== 1 ? 's' : ''} added)`)
 
-  // match_setups
-  const sRes = await ensureCollection(url, token, 'match_setups', MATCH_SETUPS_SCHEMA)
+  // match_setups — fully public so the watch can read and update status
+  const sRes = await ensureCollection(url, token, 'match_setups', MATCH_SETUPS_SCHEMA, PUBLIC_RULES)
   log.push(sRes.action === 'created'
     ? '✓ Created match_setups collection'
     : `✓ Updated match_setups (${sRes.added} field${sRes.added !== 1 ? 's' : ''} added)`)
 
-  // templates
-  const tRes = await ensureCollection(url, token, 'templates', TEMPLATES_SCHEMA)
+  // templates — public read, admin-only write (managed via web app)
+  const tRes = await ensureCollection(url, token, 'templates', TEMPLATES_SCHEMA, READONLY_RULES)
   log.push(tRes.action === 'created'
     ? '✓ Created templates collection'
     : `✓ Updated templates (${tRes.added} field${tRes.added !== 1 ? 's' : ''} added)`)
 
-  log.push('✓ All collections have public read access, admin-only write/delete')
+  log.push('✓ matches / incidents / match_setups: fully public (watch sync works without auth)')
   return log
 }
 
