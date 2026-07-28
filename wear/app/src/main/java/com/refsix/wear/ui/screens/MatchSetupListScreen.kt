@@ -12,6 +12,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.material.*
+import com.refsix.wear.data.MatchRole
 import com.refsix.wear.ui.theme.RefGreen
 import com.refsix.wear.viewmodel.MatchViewModel
 
@@ -24,6 +25,8 @@ fun MatchSetupListScreen(
     val setups by viewModel.pendingSetups.collectAsState()
     val isFetching by viewModel.isFetchingSetups.collectAsState()
 
+    var selectedSetup by remember { mutableStateOf<com.refsix.wear.data.MatchSetupData?>(null) }
+
     // Sort ascending by date then time so earliest kickoff appears first.
     val sortedSetups = remember(setups) {
         setups.sortedWith(compareBy(
@@ -34,6 +37,65 @@ fun MatchSetupListScreen(
 
     LaunchedEffect(Unit) { viewModel.refreshPendingSetup() }
 
+    // ── Role picker (shown after a fixture is tapped) ─────────────────────────
+    if (selectedSetup != null) {
+        val setup = selectedSetup!!
+        ScalingLazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            item {
+                Text(
+                    text = "LOAD AS",
+                    style = MaterialTheme.typography.title3,
+                    color = RefGreen,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            item {
+                Text(
+                    text = "${setup.homeTeam.ifBlank { "?" }} vs ${setup.awayTeam.ifBlank { "?" }}",
+                    style = MaterialTheme.typography.body2,
+                    color = Color.LightGray,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            item {
+                Chip(
+                    label = { Text("Referee", fontWeight = FontWeight.Bold) },
+                    onClick = {
+                        viewModel.applyMatchSetup(setup, MatchRole.REFEREE)
+                        onSetupSelected()
+                    },
+                    colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF1B4D1B)),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+            item {
+                Chip(
+                    label = { Text("4th Official", fontWeight = FontWeight.Bold) },
+                    onClick = {
+                        viewModel.applyMatchSetup(setup, MatchRole.FOURTH_OFFICIAL)
+                        onSetupSelected()
+                    },
+                    colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF1A3A5C)),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+            item {
+                CompactChip(
+                    label = { Text("Back", fontWeight = FontWeight.Bold) },
+                    onClick = { selectedSetup = null },
+                    colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF2A2A2A))
+                )
+            }
+        }
+        return
+    }
+
+    // ── Fixture list ──────────────────────────────────────────────────────────
     ScalingLazyColumn(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -127,10 +189,7 @@ fun MatchSetupListScreen(
                             }
                         }
                     } else null,
-                    onClick = {
-                        viewModel.applyMatchSetup(setup)
-                        onSetupSelected()
-                    },
+                    onClick = { selectedSetup = setup },
                     colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF1B4D1B)),
                     modifier = Modifier.fillMaxWidth()
                 )

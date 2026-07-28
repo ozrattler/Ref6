@@ -24,6 +24,7 @@ import com.refsix.wear.data.GpsTracker
 import com.refsix.wear.data.HeartRateTracker
 import com.refsix.wear.data.MatchEvent
 import com.refsix.wear.data.MatchPhase
+import com.refsix.wear.data.MatchRole
 import com.refsix.wear.data.MatchState
 import com.refsix.wear.data.MatchStorage
 import com.refsix.wear.data.Offences
@@ -279,16 +280,17 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
     // ── GPS tracking ─────────────────────────────────────────────────────────
 
     private fun observeRunningForGps() {
+        // GPS only in REFEREE mode — 4th Official mode skips location tracking.
         viewModelScope.launch {
-            _state.map { it.isRunning }.distinctUntilChanged().collect { running ->
-                if (running) {
-                    startGpsTracking()
-                    startHeartRateTracking()
-                } else {
-                    stopGpsTracking()
-                    stopHeartRateTracking()
-                }
-            }
+            _state.map { it.isRunning && it.role == MatchRole.REFEREE }
+                .distinctUntilChanged()
+                .collect { trackGps -> if (trackGps) startGpsTracking() else stopGpsTracking() }
+        }
+        // Heart rate runs in all modes.
+        viewModelScope.launch {
+            _state.map { it.isRunning }
+                .distinctUntilChanged()
+                .collect { running -> if (running) startHeartRateTracking() else stopHeartRateTracking() }
         }
     }
 
@@ -596,10 +598,11 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
         _isFetchingSetups.value = false
     }
 
-    fun applyMatchSetup(setup: MatchSetupData) {
+    fun applyMatchSetup(setup: MatchSetupData, role: MatchRole = MatchRole.REFEREE) {
         _appliedSetup.value = setup
         _state.update {
             it.copy(
+                role = role,
                 homeTeam = setup.homeTeam.ifBlank { "Home" },
                 awayTeam = setup.awayTeam.ifBlank { "Away" },
                 ageGroup = setup.ageGroup,

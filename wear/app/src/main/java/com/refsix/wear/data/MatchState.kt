@@ -2,6 +2,8 @@ package com.refsix.wear.data
 
 enum class MatchPhase { SETUP, FIRST_HALF, HALF_TIME, SECOND_HALF, FULL_TIME }
 
+enum class MatchRole { REFEREE, FOURTH_OFFICIAL }
+
 enum class CardType { YELLOW, RED, SIN_BIN }
 
 enum class EventType { GOAL, YELLOW_CARD, RED_CARD, SIN_BIN }
@@ -61,6 +63,7 @@ data class SinBinEntry(
 }
 
 data class MatchState(
+    val role: MatchRole = MatchRole.REFEREE,
     val homeTeam: String = "Home",
     val awayTeam: String = "Away",
     val kickOffTeam: String = "",

@@ -32,6 +32,7 @@ class MatchStorage(context: Context) {
         return JSONObject().apply {
             put("schema_version", SCHEMA_VERSION)
             put("htBreakStartMillis", htBreakStartMillis)
+            put("role", state.role.name)
             put("homeTeam", state.homeTeam)
             put("awayTeam", state.awayTeam)
             put("kickOffTeam", state.kickOffTeam)
@@ -140,6 +141,7 @@ class MatchStorage(context: Context) {
         val heartRateReadings = (0 until hrArr.length()).map { i -> hrArr.getInt(i) }
 
         val state = MatchState(
+            role = runCatching { MatchRole.valueOf(obj.optString("role", "REFEREE")) }.getOrDefault(MatchRole.REFEREE),
             homeTeam = obj.getString("homeTeam"),
             awayTeam = obj.getString("awayTeam"),
             kickOffTeam = obj.getString("kickOffTeam"),
@@ -241,7 +243,7 @@ class MatchStorage(context: Context) {
 
     companion object {
         private const val MAX_MATCHES = 5
-        const val SCHEMA_VERSION = 2  // bump whenever serialised fields change
+        const val SCHEMA_VERSION = 3  // bump whenever serialised fields change
 
         fun buildGpsTrackJson(state: MatchState): String {
             if (state.gpsPoints.isEmpty()) return ""
