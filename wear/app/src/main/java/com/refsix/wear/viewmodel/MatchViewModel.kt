@@ -280,21 +280,22 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
     // ── GPS tracking ─────────────────────────────────────────────────────────
 
     private fun observeRunningForGps() {
-        // GPS only in REFEREE mode — 4th Official mode skips location tracking.
         viewModelScope.launch {
-            _state.map { it.isRunning && it.role == MatchRole.REFEREE }
-                .distinctUntilChanged()
-                .collect { trackGps -> if (trackGps) startGpsTracking() else stopGpsTracking() }
-        }
-        // Heart rate runs in all modes.
-        viewModelScope.launch {
-            _state.map { it.isRunning }
-                .distinctUntilChanged()
-                .collect { running -> if (running) startHeartRateTracking() else stopHeartRateTracking() }
+            _state.map { it.isRunning }.distinctUntilChanged().collect { running ->
+                if (running) {
+                    startGpsTracking()
+                    startHeartRateTracking()
+                } else {
+                    stopGpsTracking()
+                    stopHeartRateTracking()
+                }
+            }
         }
     }
 
     private fun startGpsTracking() {
+        // 4th Official mode: no GPS — distance/speed not recorded for this role.
+        if (_state.value.role == MatchRole.FOURTH_OFFICIAL) return
         if (gpsActive) return
         val app = getApplication<Application>()
         if (ContextCompat.checkSelfPermission(app, Manifest.permission.ACCESS_FINE_LOCATION)
