@@ -27,6 +27,7 @@ export function parseGpsTrack(raw) {
 }
 
 const MAX_PLOT_SPEED_MS = 25 / 3.6  // same threshold as Wear distance guard
+const MAX_JUMP_M = 50                // drop any single step >50 m regardless of time gap
 
 function filterGpsTrack(raw) {
   if (!raw.length) return []
@@ -36,11 +37,27 @@ function filterGpsTrack(raw) {
     const pt   = raw[i]
     const dtMs = pt.timestamp - prev.timestamp
     if (dtMs <= 0) continue
-    const distKm  = haversineKm(prev.latitude, prev.longitude, pt.latitude, pt.longitude)
-    const speedMs = (distKm * 1000) / (dtMs / 1000)
-    if (speedMs <= MAX_PLOT_SPEED_MS) out.push(pt)
+    const distM   = haversineKm(prev.latitude, prev.longitude, pt.latitude, pt.longitude) * 1000
+    const speedMs = distM / (dtMs / 1000)
+    // Reject if implied speed is too high OR if the jump is implausibly large
+    // (large time gaps make speed look plausible even for outlier positions)
+    if (speedMs <= MAX_PLOT_SPEED_MS && distM <= MAX_JUMP_M) out.push(pt)
   }
   return out
+}
+
+// Split a filtered track into polyline segments; break the line at pauses / half-time
+const SEGMENT_GAP_S = 60
+
+function segmentTrack(pts) {
+  if (!pts.length) return []
+  const segs = [[pts[0]]]
+  for (let i = 1; i < pts.length; i++) {
+    const dtSecs = (pts[i].timestamp - pts[i - 1].timestamp) / 1000
+    if (dtSecs > SEGMENT_GAP_S) segs.push([pts[i]])
+    else segs[segs.length - 1].push(pts[i])
+  }
+  return segs.filter(s => s.length >= 2)
 }
 
 const SPEED_ZONES = [
@@ -494,12 +511,12 @@ function PitchMapSection({ filteredTrack, incidents }) {
     minLng: rawMinLng - lngPad, maxLng: rawMaxLng + lngPad,
   }
 
-  const trackPts = filteredTrack
-    .map(p => {
+  const trackSegments = segmentTrack(filteredTrack).map(seg =>
+    seg.map(p => {
       const { x, y } = normalizePt(p.latitude, p.longitude, bounds, SVG_W, SVG_H)
       return `${x.toFixed(2)},${y.toFixed(2)}`
-    })
-    .join(' ')
+    }).join(' ')
+  )
 
   return (
     <div className="rpt-section">
@@ -532,11 +549,11 @@ function PitchMapSection({ filteredTrack, incidents }) {
           <circle cx="11" cy="34" r="0.5" fill="rgba(255,255,255,.65)" />
           <circle cx="94" cy="34" r="0.5" fill="rgba(255,255,255,.65)" />
 
-          {trackPts && (
-            <polyline points={trackPts} fill="none"
+          {trackSegments.map((pts, idx) => (
+            <polyline key={idx} points={pts} fill="none"
               stroke="rgba(255,255,255,.3)" strokeWidth="0.6"
               strokeLinejoin="round" strokeLinecap="round" />
-          )}
+          ))}
 
           {geoInc.map(i => {
             const { x, y } = normalizePt(i.latitude, i.longitude, bounds, SVG_W, SVG_H)
