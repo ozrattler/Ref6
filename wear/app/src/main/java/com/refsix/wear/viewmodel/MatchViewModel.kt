@@ -780,18 +780,44 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
         saveInProgress()
     }
 
-    fun editEvent(eventId: Long, newTeam: String, newPlayerNumber: String) {
+    fun editEvent(
+        eventId: Long,
+        newType: EventType,
+        newTeam: String,
+        newPlayerNumber: String,
+        newMinute: Int
+    ) {
         _state.update { s ->
             val event = s.events.find { it.id == eventId } ?: return@update s
-            val updatedEvent = event.copy(team = newTeam, playerNumber = newPlayerNumber)
+            val updatedEvent = event.copy(
+                type = newType,
+                team = newTeam,
+                playerNumber = newPlayerNumber,
+                matchMinute = newMinute
+            )
             val updatedEvents = s.events.map { if (it.id == eventId) updatedEvent else it }
             var homeScore = s.homeScore
             var awayScore = s.awayScore
-            if (event.type == EventType.GOAL && event.team != newTeam) {
-                if (event.team == s.homeTeam && newTeam == s.awayTeam) {
-                    homeScore = maxOf(0, homeScore - 1); awayScore += 1
-                } else if (event.team == s.awayTeam && newTeam == s.homeTeam) {
-                    awayScore = maxOf(0, awayScore - 1); homeScore += 1
+            val oldIsGoal = event.type == EventType.GOAL
+            val newIsGoal = newType == EventType.GOAL
+            when {
+                // Goal removed: decrement old team's score
+                oldIsGoal && !newIsGoal -> {
+                    if (event.team == s.homeTeam) homeScore = maxOf(0, homeScore - 1)
+                    else if (event.team == s.awayTeam) awayScore = maxOf(0, awayScore - 1)
+                }
+                // Goal added: increment new team's score
+                !oldIsGoal && newIsGoal -> {
+                    if (newTeam == s.homeTeam) homeScore += 1
+                    else if (newTeam == s.awayTeam) awayScore += 1
+                }
+                // Goal kept but team swapped: move the point
+                oldIsGoal && newIsGoal && event.team != newTeam -> {
+                    if (event.team == s.homeTeam) {
+                        homeScore = maxOf(0, homeScore - 1); awayScore += 1
+                    } else {
+                        awayScore = maxOf(0, awayScore - 1); homeScore += 1
+                    }
                 }
             }
             s.copy(events = updatedEvents, homeScore = homeScore, awayScore = awayScore)

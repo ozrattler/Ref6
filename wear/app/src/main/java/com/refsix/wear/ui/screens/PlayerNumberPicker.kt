@@ -175,7 +175,7 @@ private fun KeypadButton(label: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun HoldableStepButton(label: String, onStep: () -> Unit) {
+internal fun HoldableStepButton(label: String, onStep: () -> Unit) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val currentOnStep by rememberUpdatedState(onStep)

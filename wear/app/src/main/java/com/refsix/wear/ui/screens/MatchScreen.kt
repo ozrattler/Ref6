@@ -381,8 +381,8 @@ private fun MainMatchPage(
                 event = ms.event,
                 homeTeam = state.homeTeam,
                 awayTeam = state.awayTeam,
-                onSave = { newTeam, newPlayer ->
-                    viewModel.editEvent(ms.event.id, newTeam, newPlayer)
+                onSave = { newType, newTeam, newPlayer, newMinute ->
+                    viewModel.editEvent(ms.event.id, newType, newTeam, newPlayer, newMinute)
                     menuState = MenuState.None
                 },
                 onBack = { menuState = MenuState.EventListPick(forDelete = false) }
@@ -572,16 +572,18 @@ private fun EditEventOverlay(
     event: MatchEvent,
     homeTeam: String,
     awayTeam: String,
-    onSave: (team: String, playerNumber: String) -> Unit,
+    onSave: (type: EventType, team: String, playerNumber: String, minute: Int) -> Unit,
     onBack: () -> Unit
 ) {
+    var selectedType by remember { mutableStateOf(event.type) }
     var selectedTeam by remember { mutableStateOf(event.team) }
     var playerNum by remember { mutableIntStateOf(event.playerNumber.toIntOrNull() ?: 0) }
+    var matchMinute by remember { mutableIntStateOf(event.matchMinute.coerceAtLeast(1)) }
 
-    // Card events use playerNumber; goals use scorerNumber — only show picker for card events
-    val showPlayerPicker = event.type == EventType.YELLOW_CARD ||
-                           event.type == EventType.RED_CARD ||
-                           event.type == EventType.SIN_BIN
+    // Player # only meaningful for card / sin bin events
+    val showPlayerPicker = selectedType == EventType.YELLOW_CARD ||
+                           selectedType == EventType.RED_CARD ||
+                           selectedType == EventType.SIN_BIN
 
     Box(
         modifier = Modifier
@@ -597,21 +599,53 @@ private fun EditEventOverlay(
             item {
                 Text("EDIT EVENT", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = RefGreen)
             }
+
+            // ── Type selector ────────────────────────────────────────────────
             item {
-                val typeLabel = when (event.type) {
-                    EventType.GOAL        -> "Goal"
-                    EventType.YELLOW_CARD -> "Yellow Card"
-                    EventType.RED_CARD    -> "Red Card"
-                    EventType.SIN_BIN     -> "Sin Bin"
+                Text("Type", style = MaterialTheme.typography.caption2, color = Color.Gray)
+            }
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    CompactChip(
+                        label = { Text("GOAL", fontWeight = FontWeight.Bold) },
+                        onClick = { selectedType = EventType.GOAL },
+                        colors = ChipDefaults.chipColors(
+                            backgroundColor = if (selectedType == EventType.GOAL)
+                                Color(0xFF2E7D32) else Color(0xFF2A2A2A)
+                        )
+                    )
+                    CompactChip(
+                        label = { Text("YC", fontWeight = FontWeight.Bold) },
+                        onClick = { selectedType = EventType.YELLOW_CARD },
+                        colors = ChipDefaults.chipColors(
+                            backgroundColor = if (selectedType == EventType.YELLOW_CARD)
+                                RefYellow else Color(0xFF2A2A2A)
+                        )
+                    )
                 }
-                Text(
-                    text = "$typeLabel  ${event.matchMinute}'",
-                    style = MaterialTheme.typography.caption1,
-                    color = Color.LightGray
-                )
+            }
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    CompactChip(
+                        label = { Text("RC", fontWeight = FontWeight.Bold) },
+                        onClick = { selectedType = EventType.RED_CARD },
+                        colors = ChipDefaults.chipColors(
+                            backgroundColor = if (selectedType == EventType.RED_CARD)
+                                RefRed else Color(0xFF2A2A2A)
+                        )
+                    )
+                    CompactChip(
+                        label = { Text("SIN", fontWeight = FontWeight.Bold) },
+                        onClick = { selectedType = EventType.SIN_BIN },
+                        colors = ChipDefaults.chipColors(
+                            backgroundColor = if (selectedType == EventType.SIN_BIN)
+                                RefOrange else Color(0xFF2A2A2A)
+                        )
+                    )
+                }
             }
 
-            // Team toggle
+            // ── Team toggle ──────────────────────────────────────────────────
             item {
                 Text("Team", style = MaterialTheme.typography.caption2, color = Color.Gray)
             }
@@ -634,7 +668,7 @@ private fun EditEventOverlay(
                 }
             }
 
-            // Player number picker — only for card/sin bin events
+            // ── Player # (card / sin bin only) ───────────────────────────────
             if (showPlayerPicker) {
                 item {
                     Text("Player #", style = MaterialTheme.typography.caption2, color = Color.Gray)
@@ -647,13 +681,46 @@ private fun EditEventOverlay(
                 }
             }
 
+            // ── Minute ───────────────────────────────────────────────────────
+            item {
+                Text("Minute", style = MaterialTheme.typography.caption2, color = Color.Gray)
+            }
+            item {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    HoldableStepButton("−") { if (matchMinute > 1) matchMinute-- }
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(width = 56.dp, height = 36.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color(0xFF1E1E1E))
+                    ) {
+                        Text(
+                            text = "$matchMinute",
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                    HoldableStepButton("+") { if (matchMinute < 120) matchMinute++ }
+                }
+            }
+
+            // ── Save / Back ──────────────────────────────────────────────────
             item {
                 Chip(
                     label = { Text("Save", fontWeight = FontWeight.Bold) },
                     onClick = {
-                        val newPlayer = if (showPlayerPicker && playerNum > 0) "$playerNum"
-                                        else event.playerNumber
-                        onSave(selectedTeam, newPlayer)
+                        val newPlayer = when {
+                            showPlayerPicker && playerNum > 0 -> "$playerNum"
+                            showPlayerPicker                  -> event.playerNumber
+                            else                             -> ""
+                        }
+                        onSave(selectedType, selectedTeam, newPlayer, matchMinute)
                     },
                     colors = ChipDefaults.chipColors(backgroundColor = RefGreen),
                     modifier = Modifier.fillMaxWidth()
