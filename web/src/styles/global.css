@@ -274,8 +274,8 @@ body {
 .rpt-scoreline {
   font-size: 2.2rem;
   font-weight: 800;
-  color: var(--accent);
-  background: rgba(34,197,94,.1);
+  color: #111;
+  background: #fff;
   padding: 5px 16px;
   border-radius: var(--radius-sm);
   min-width: 90px;
@@ -355,6 +355,54 @@ body {
 }
 .rpt-event-player { font-weight: 500; }
 .rpt-event-meta   { font-size: 0.75rem; color: var(--muted); }
+
+.rpt-half-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--muted);
+  padding: 3px 0 2px;
+  border-bottom: 1px solid var(--border);
+  margin: 2px 0 4px;
+}
+.rpt-half-label-away { text-align: right; }
+
+/* ── Speed zones ── */
+.sz-list { display: flex; flex-direction: column; gap: 5px; }
+.sz-row  { display: flex; align-items: center; gap: 8px; }
+.sz-label-wrap {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 130px;
+  flex-shrink: 0;
+}
+.sz-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.sz-label { font-size: 0.8rem; font-weight: 600; white-space: nowrap; }
+.sz-range { font-size: 0.67rem; color: var(--muted); white-space: nowrap; }
+.sz-bar-wrap {
+  flex: 1;
+  height: 6px;
+  background: var(--surface-hover);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.sz-bar { height: 100%; border-radius: 3px; min-width: 2px; }
+.sz-time {
+  font-size: 0.74rem;
+  color: var(--muted);
+  min-width: 52px;
+  text-align: right;
+  flex-shrink: 0;
+}
+.sz-pct {
+  font-size: 0.74rem;
+  font-weight: 600;
+  min-width: 30px;
+  text-align: right;
+  flex-shrink: 0;
+}
 
 /* 5. Status */
 .rpt-status-row {
@@ -1374,8 +1422,8 @@ body {
 .mc2-score {
   font-size: 1.05rem;
   font-weight: 800;
-  color: var(--accent);
-  background: rgba(34,197,94,.1);
+  color: #111;
+  background: #fff;
   padding: 2px 9px;
   border-radius: var(--radius-sm);
   white-space: nowrap;

@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { pb } from '../lib/pb'
 import { kitStyle } from '../lib/colours'
 import { useAuth } from '../lib/auth'
-import { calcTotalDistanceKm } from '../lib/gps'
+import { calcTotalDistanceKm, haversineKm } from '../lib/gps'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -24,6 +24,69 @@ const TYPE_LABEL = {
 export function parseGpsTrack(raw) {
   if (!raw) return []
   try { return JSON.parse(raw) } catch { return [] }
+}
+
+const MAX_PLOT_SPEED_MS = 25 / 3.6  // same threshold as Wear distance guard
+
+function filterGpsTrack(raw) {
+  if (!raw.length) return []
+  const out = [raw[0]]
+  for (let i = 1; i < raw.length; i++) {
+    const prev = out[out.length - 1]
+    const pt   = raw[i]
+    const dtMs = pt.timestamp - prev.timestamp
+    if (dtMs <= 0) continue
+    const distKm  = haversineKm(prev.latitude, prev.longitude, pt.latitude, pt.longitude)
+    const speedMs = (distKm * 1000) / (dtMs / 1000)
+    if (speedMs <= MAX_PLOT_SPEED_MS) out.push(pt)
+  }
+  return out
+}
+
+const SPEED_ZONES = [
+  { label: 'Walk',     range: '< 6 km/h',   minKmh: 0,  maxKmh: 6,        color: '#60a5fa' },
+  { label: 'Slow Jog', range: '6–8 km/h',   minKmh: 6,  maxKmh: 8,        color: '#34d399' },
+  { label: 'Jog',      range: '8–11 km/h',  minKmh: 8,  maxKmh: 11,       color: '#fbbf24' },
+  { label: 'Run',      range: '11–14 km/h', minKmh: 11, maxKmh: 14,       color: '#f97316' },
+  { label: 'Fast',     range: '> 14 km/h',  minKmh: 14, maxKmh: Infinity, color: '#ef4444' },
+]
+
+function computeSpeedZones(filteredTrack) {
+  const secs = SPEED_ZONES.map(() => 0)
+  for (let i = 1; i < filteredTrack.length; i++) {
+    const prev = filteredTrack[i - 1]
+    const pt   = filteredTrack[i]
+    const dtSecs = (pt.timestamp - prev.timestamp) / 1000
+    if (dtSecs <= 0 || dtSecs > 120) continue  // skip huge gaps (half-time, paused, etc.)
+    const distKm = haversineKm(prev.latitude, prev.longitude, pt.latitude, pt.longitude)
+    const kmh    = (distKm / dtSecs) * 3600
+    for (let z = 0; z < SPEED_ZONES.length; z++) {
+      if (kmh < SPEED_ZONES[z].maxKmh) { secs[z] += dtSecs; break }
+    }
+  }
+  const total = secs.reduce((s, v) => s + v, 0)
+  return SPEED_ZONES.map((z, i) => ({
+    ...z,
+    secs: secs[i],
+    pct:  total > 0 ? secs[i] / total * 100 : 0,
+  }))
+}
+
+function fmtZoneTime(secs) {
+  const m = Math.floor(secs / 60)
+  const s = Math.round(secs % 60)
+  return m > 0 ? `${m}m ${s}s` : `${s}s`
+}
+
+function incidentDotColor(i) {
+  if (i.type === 'SIN_BIN') return '#f97316'
+  // dissent yellows are functionally sin-bins — show in the same orange
+  if (i.type === 'YELLOW_CARD' && i.offence_description === 'Dissent') return '#f97316'
+  return INCIDENT_COLORS[i.type] ?? '#888'
+}
+
+function sameTeam(a, b) {
+  return (a || '').trim().toLowerCase() === (b || '').trim().toLowerCase()
 }
 
 // ── Page component ────────────────────────────────────────────────────────────
@@ -150,7 +213,8 @@ export default function MatchDetail() {
 // ── Shared match report view ──────────────────────────────────────────────────
 
 export function MatchReport({ match: m, incidents = [] }) {
-  const gpsTrack  = parseGpsTrack(m.gps_track)
+  const gpsTrack      = parseGpsTrack(m.gps_track)
+  const filteredTrack = filterGpsTrack(gpsTrack)
   const hasGps    = gpsTrack.length > 0 || incidents.some(i => i.latitude && i.longitude)
   const hasStats  = gpsTrack.length > 1 || m.total_distance_km || m.average_speed_kmh
                  || m.max_speed_kmh   || m.avg_heart_rate    || m.max_heart_rate
@@ -188,8 +252,11 @@ export function MatchReport({ match: m, incidents = [] }) {
       {/* 6. Performance stats */}
       {hasStats && <PerformanceStats match={m} gpsTrack={gpsTrack} />}
 
-      {/* 7. GPS pitch heatmap */}
-      {hasGps && <PitchMapSection gpsTrack={gpsTrack} incidents={incidents} />}
+      {/* 6b. Speed zones */}
+      {filteredTrack.length >= 2 && <SpeedZones filteredTrack={filteredTrack} />}
+
+      {/* 7. GPS track */}
+      {hasGps && <PitchMapSection filteredTrack={filteredTrack} incidents={incidents} />}
 
       {/* 8. Match officials — always shown */}
       <div className="rpt-section">
@@ -214,8 +281,8 @@ export function MatchReport({ match: m, incidents = [] }) {
 // ── Score + per-team incidents ────────────────────────────────────────────────
 
 function ScoreAndEvents({ match: m, incidents }) {
-  const homeInc = incidents.filter(i => i.team === m.home_team)
-  const awayInc = incidents.filter(i => i.team === m.away_team)
+  const homeInc = incidents.filter(i => sameTeam(i.team, m.home_team))
+  const awayInc = incidents.filter(i => sameTeam(i.team, m.away_team))
 
   const homeHasEvents = homeInc.length > 0
   const awayHasEvents = awayInc.length > 0
@@ -281,17 +348,30 @@ function TeamEvents({ incidents, rightAlign = false }) {
 }
 
 function EventGroup({ label, color, events, rightAlign, renderLine }) {
+  const half1 = events.filter(i => (i.half || 1) === 1)
+  const half2 = events.filter(i => i.half === 2)
+  const multiHalf = half1.length > 0 && half2.length > 0
+
+  const renderLines = (list) => list.map(i => (
+    <div key={i.id} className={`rpt-event-line${rightAlign ? ' rpt-event-line-away' : ''}`}>
+      {renderLine(i)}
+    </div>
+  ))
+
   return (
     <div className="rpt-event-group">
       <div className={`rpt-event-label${rightAlign ? ' rpt-event-label-away' : ''}`}>
         <span className="rpt-event-dot" style={{ background: color }} />
         {label}
       </div>
-      {events.map(i => (
-        <div key={i.id} className={`rpt-event-line${rightAlign ? ' rpt-event-line-away' : ''}`}>
-          {renderLine(i)}
-        </div>
-      ))}
+      {multiHalf ? (
+        <>
+          <div className={`rpt-half-label${rightAlign ? ' rpt-half-label-away' : ''}`}>1st Half</div>
+          {renderLines(half1)}
+          <div className={`rpt-half-label${rightAlign ? ' rpt-half-label-away' : ''}`}>2nd Half</div>
+          {renderLines(half2)}
+        </>
+      ) : renderLines(events)}
     </div>
   )
 }
@@ -353,7 +433,37 @@ function PerformanceStats({ match: m, gpsTrack = [] }) {
   )
 }
 
-// ── GPS pitch heatmap ─────────────────────────────────────────────────────────
+// ── Speed zones ───────────────────────────────────────────────────────────────
+
+function SpeedZones({ filteredTrack }) {
+  const zones = computeSpeedZones(filteredTrack)
+  const totalSecs = zones.reduce((s, z) => s + z.secs, 0)
+  if (totalSecs < 1) return null
+
+  return (
+    <div className="rpt-section">
+      <div className="rpt-section-label">Speed Zones</div>
+      <div className="sz-list">
+        {zones.map(z => (
+          <div key={z.label} className="sz-row">
+            <div className="sz-label-wrap">
+              <span className="sz-dot" style={{ background: z.color }} />
+              <span className="sz-label">{z.label}</span>
+              <span className="sz-range">{z.range}</span>
+            </div>
+            <div className="sz-bar-wrap">
+              <div className="sz-bar" style={{ width: `${z.pct}%`, background: z.color }} />
+            </div>
+            <span className="sz-time">{z.secs >= 1 ? fmtZoneTime(z.secs) : '—'}</span>
+            <span className="sz-pct">{Math.round(z.pct)}%</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ── GPS pitch track ───────────────────────────────────────────────────────────
 
 function normalizePt(lat, lng, bounds, svgW, svgH) {
   const latRange = bounds.maxLat - bounds.minLat || 0.0001
@@ -364,14 +474,14 @@ function normalizePt(lat, lng, bounds, svgW, svgH) {
   }
 }
 
-function PitchMapSection({ gpsTrack, incidents }) {
+function PitchMapSection({ filteredTrack, incidents }) {
   const [tooltip, setTooltip] = useState(null)
   const SVG_W = 105
   const SVG_H = 68
 
   const geoInc = incidents.filter(i => i.latitude && i.longitude)
-  const allLats = [...gpsTrack.map(p => p.latitude), ...geoInc.map(i => i.latitude)]
-  const allLngs = [...gpsTrack.map(p => p.longitude), ...geoInc.map(i => i.longitude)]
+  const allLats = [...filteredTrack.map(p => p.latitude), ...geoInc.map(i => i.latitude)]
+  const allLngs = [...filteredTrack.map(p => p.longitude), ...geoInc.map(i => i.longitude)]
 
   if (allLats.length === 0) return null
 
@@ -384,7 +494,7 @@ function PitchMapSection({ gpsTrack, incidents }) {
     minLng: rawMinLng - lngPad, maxLng: rawMaxLng + lngPad,
   }
 
-  const trackPts = gpsTrack
+  const trackPts = filteredTrack
     .map(p => {
       const { x, y } = normalizePt(p.latitude, p.longitude, bounds, SVG_W, SVG_H)
       return `${x.toFixed(2)},${y.toFixed(2)}`
@@ -394,7 +504,7 @@ function PitchMapSection({ gpsTrack, incidents }) {
   return (
     <div className="rpt-section">
       <div className="rpt-section-label">
-        GPS Heatmap
+        GPS Track
         <span className="rpt-map-legend">
           {Object.entries(INCIDENT_COLORS).map(([type, color]) => (
             <span key={type} className="rpt-legend-item">
@@ -432,7 +542,7 @@ function PitchMapSection({ gpsTrack, incidents }) {
             const { x, y } = normalizePt(i.latitude, i.longitude, bounds, SVG_W, SVG_H)
             return (
               <circle key={i.id} cx={x} cy={y} r="2.4"
-                fill={INCIDENT_COLORS[i.type] ?? '#888'}
+                fill={incidentDotColor(i)}
                 stroke="white" strokeWidth="0.45" opacity="0.93"
                 style={{ cursor: 'default' }}
                 onMouseEnter={e => setTooltip({
