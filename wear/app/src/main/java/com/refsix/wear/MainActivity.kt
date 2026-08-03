@@ -333,6 +333,13 @@ class MainActivity : ComponentActivity() {
                         )
                     }
 
+                    composable("addEvent") {
+                        AddEventScreen(
+                            viewModel = matchViewModel,
+                            navController = navController
+                        )
+                    }
+
                     composable(
                         route = "report/{index}",
                         arguments = listOf(

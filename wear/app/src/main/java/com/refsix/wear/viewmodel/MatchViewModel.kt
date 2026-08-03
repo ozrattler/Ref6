@@ -767,6 +767,38 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
         saveInProgress()
     }
 
+    fun deleteEvent(eventId: Long) {
+        _state.update { s ->
+            val event = s.events.find { it.id == eventId } ?: return@update s
+            val newEvents = s.events.filter { it.id != eventId }
+            val homeScore = if (event.type == EventType.GOAL && event.team == s.homeTeam)
+                maxOf(0, s.homeScore - 1) else s.homeScore
+            val awayScore = if (event.type == EventType.GOAL && event.team == s.awayTeam)
+                maxOf(0, s.awayScore - 1) else s.awayScore
+            s.copy(events = newEvents, homeScore = homeScore, awayScore = awayScore)
+        }
+        saveInProgress()
+    }
+
+    fun editEvent(eventId: Long, newTeam: String, newPlayerNumber: String) {
+        _state.update { s ->
+            val event = s.events.find { it.id == eventId } ?: return@update s
+            val updatedEvent = event.copy(team = newTeam, playerNumber = newPlayerNumber)
+            val updatedEvents = s.events.map { if (it.id == eventId) updatedEvent else it }
+            var homeScore = s.homeScore
+            var awayScore = s.awayScore
+            if (event.type == EventType.GOAL && event.team != newTeam) {
+                if (event.team == s.homeTeam && newTeam == s.awayTeam) {
+                    homeScore = maxOf(0, homeScore - 1); awayScore += 1
+                } else if (event.team == s.awayTeam && newTeam == s.homeTeam) {
+                    awayScore = maxOf(0, awayScore - 1); homeScore += 1
+                }
+            }
+            s.copy(events = updatedEvents, homeScore = homeScore, awayScore = awayScore)
+        }
+        saveInProgress()
+    }
+
     fun clearHistory() {
         matchStorage.clearHistory()
         _savedMatches.value = emptyList()

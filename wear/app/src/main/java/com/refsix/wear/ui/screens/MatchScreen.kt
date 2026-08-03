@@ -26,13 +26,25 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.activity.compose.BackHandler
 import androidx.navigation.NavController
+import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.material.*
 import com.refsix.wear.data.CardAlertType
+import com.refsix.wear.data.EventType
+import com.refsix.wear.data.MatchEvent
 import com.refsix.wear.data.MatchPhase
 import com.refsix.wear.data.MatchState
 import com.refsix.wear.ui.theme.*
 import com.refsix.wear.viewmodel.MatchViewModel
 import kotlinx.coroutines.delay
+
+// Overlay state machine for the long-press options menu and event management flows.
+private sealed class MenuState {
+    object None : MenuState()
+    object Options : MenuState()
+    class EventListPick(val forDelete: Boolean) : MenuState()
+    class EditEventForm(val event: MatchEvent) : MenuState()
+    class DeleteConfirm(val event: MatchEvent) : MenuState()
+}
 
 @Composable
 fun MatchScreen(navController: NavController, viewModel: MatchViewModel) {
@@ -202,7 +214,7 @@ private fun MainMatchPage(
 
     var totalVerticalDrag by remember { mutableFloatStateOf(0f) }
     var swipeTriggered by remember { mutableStateOf(false) }
-    var showMatchMenu by remember { mutableStateOf(false) }
+    var menuState by remember { mutableStateOf<MenuState>(MenuState.None) }
 
     Box(
         modifier = Modifier
@@ -222,11 +234,8 @@ private fun MainMatchPage(
                 )
             }
             // Long press opens match options without pausing the timer.
-            // The timer coroutine lives in viewModelScope and suspends only on
-            // delay() — pointer input handling on the main dispatcher cannot
-            // block or cancel it.
             .pointerInput(Unit) {
-                detectTapGestures(onLongPress = { showMatchMenu = true })
+                detectTapGestures(onLongPress = { menuState = MenuState.Options })
             },
         contentAlignment = Alignment.Center
     ) {
@@ -245,30 +254,27 @@ private fun MainMatchPage(
                 color = Color.Gray
             )
 
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
-            ) {
+            // Elapsed clock
+            Text(
+                text = "%02d:%02d".format(state.displayMinutes, state.displaySeconds),
+                fontSize = 30.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (state.isRunning) Color.White else Color.Gray
+            )
+
+            // Countdown on its own line — enlarged so it's easy to read at a glance
+            if (!state.isInAdditionalTime) {
+                val remaining = state.halfRemainingSeconds
                 Text(
-                    text = "%02d:%02d".format(state.displayMinutes, state.displaySeconds),
-                    fontSize = 30.sp,
+                    text = "-%02d:%02d".format(remaining / 60, remaining % 60),
+                    fontSize = 26.sp,
                     fontWeight = FontWeight.Bold,
-                    color = if (state.isRunning) Color.White else Color.Gray
+                    color = when {
+                        remaining <= 60 -> RefRed
+                        remaining <= 120 -> RefYellow
+                        else -> Color.White
+                    }
                 )
-                if (!state.isInAdditionalTime) {
-                    val remaining = state.halfRemainingSeconds
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "-%02d:%02d".format(remaining / 60, remaining % 60),
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = when {
-                            remaining <= 60 -> RefRed
-                            remaining <= 120 -> RefYellow
-                            else -> Color.White
-                        }
-                    )
-                }
             }
 
             if (state.isInAdditionalTime) {
@@ -305,8 +311,6 @@ private fun MainMatchPage(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable { navController.navigate("sinBin") }
-                        // 12 dp inset keeps text clear of the circular bezel at this
-                        // vertical position (≈40–50 dp below screen centre).
                         .padding(horizontal = 12.dp, vertical = 2.dp),
                     verticalAlignment = Alignment.Top
                 ) {
@@ -347,60 +351,383 @@ private fun MainMatchPage(
             }
         }
 
-        // Match options menu — long press to open; timer keeps running throughout
-        if (showMatchMenu) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color(0xEE000000)),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xFF1A1A2A))
-                        .padding(horizontal = 16.dp, vertical = 14.dp)
-                ) {
-                    Text(
-                        text = "MATCH OPTIONS",
-                        fontSize = 11.sp,
-                        color = Color.Gray
-                    )
-                    Chip(
-                        label = {
-                            Text(
-                                text = if (state.isRunning) "Pause Match" else "Resume Match",
-                                fontWeight = FontWeight.Bold
-                            )
-                        },
-                        onClick = {
-                            viewModel.toggleTimer()
-                            showMatchMenu = false
-                        },
-                        colors = ChipDefaults.chipColors(backgroundColor = RefBlue),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Chip(
-                        label = { Text("End Match", fontWeight = FontWeight.Bold) },
-                        onClick = {
-                            showMatchMenu = false
-                            navController.navigate("confirmEnd/fullTime")
-                        },
-                        colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF4A1A1A)),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    CompactChip(
-                        label = { Text("Cancel", fontWeight = FontWeight.Bold) },
-                        onClick = { showMatchMenu = false },
-                        colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF333333))
-                    )
-                }
+        // ── Overlay state machine ─────────────────────────────────────────────
+        when (val ms = menuState) {
+            MenuState.None -> {}
+
+            MenuState.Options -> OptionsMenuOverlay(
+                isRunning = state.isRunning,
+                onPauseResume = { viewModel.toggleTimer(); menuState = MenuState.None },
+                onEndMatch = { menuState = MenuState.None; navController.navigate("confirmEnd/fullTime") },
+                onEditEvent = { menuState = MenuState.EventListPick(forDelete = false) },
+                onAddEvent  = { menuState = MenuState.None; navController.navigate("addEvent") },
+                onDeleteEvent = { menuState = MenuState.EventListPick(forDelete = true) },
+                onDismiss = { menuState = MenuState.None }
+            )
+
+            is MenuState.EventListPick -> EventListOverlay(
+                events = state.events,
+                homeTeam = state.homeTeam,
+                awayTeam = state.awayTeam,
+                forDelete = ms.forDelete,
+                onEventSelected = { event ->
+                    menuState = if (ms.forDelete) MenuState.DeleteConfirm(event)
+                                 else MenuState.EditEventForm(event)
+                },
+                onBack = { menuState = MenuState.Options }
+            )
+
+            is MenuState.EditEventForm -> EditEventOverlay(
+                event = ms.event,
+                homeTeam = state.homeTeam,
+                awayTeam = state.awayTeam,
+                onSave = { newTeam, newPlayer ->
+                    viewModel.editEvent(ms.event.id, newTeam, newPlayer)
+                    menuState = MenuState.None
+                },
+                onBack = { menuState = MenuState.EventListPick(forDelete = false) }
+            )
+
+            is MenuState.DeleteConfirm -> DeleteConfirmOverlay(
+                event = ms.event,
+                onConfirm = { viewModel.deleteEvent(ms.event.id); menuState = MenuState.None },
+                onBack = { menuState = MenuState.EventListPick(forDelete = true) }
+            )
+        }
+    }
+}
+
+// ── Options overlay ───────────────────────────────────────────────────────────
+
+@Composable
+private fun OptionsMenuOverlay(
+    isRunning: Boolean,
+    onPauseResume: () -> Unit,
+    onEndMatch: () -> Unit,
+    onEditEvent: () -> Unit,
+    onAddEvent: () -> Unit,
+    onDeleteEvent: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xEE000000)),
+        contentAlignment = Alignment.Center
+    ) {
+        ScalingLazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            item {
+                Text("OPTIONS", fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+            }
+            item {
+                Chip(
+                    label = {
+                        Text(
+                            text = if (isRunning) "Pause Match" else "Resume Match",
+                            fontWeight = FontWeight.Bold
+                        )
+                    },
+                    onClick = onPauseResume,
+                    colors = ChipDefaults.chipColors(backgroundColor = RefBlue),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+            item {
+                Chip(
+                    label = { Text("End Match", fontWeight = FontWeight.Bold) },
+                    onClick = onEndMatch,
+                    colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF4A1A1A)),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+            item {
+                Spacer(modifier = Modifier.height(2.dp))
+                Text("EVENT", fontSize = 10.sp, color = Color.Gray)
+            }
+            item {
+                Chip(
+                    label = { Text("Edit", fontWeight = FontWeight.Bold) },
+                    onClick = onEditEvent,
+                    colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF1B3A1B)),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+            item {
+                Chip(
+                    label = { Text("Add", fontWeight = FontWeight.Bold) },
+                    onClick = onAddEvent,
+                    colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF1A2A4A)),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+            item {
+                Chip(
+                    label = { Text("Delete", fontWeight = FontWeight.Bold) },
+                    onClick = onDeleteEvent,
+                    colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF5A1A1A)),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+            item {
+                CompactChip(
+                    label = { Text("Cancel", fontWeight = FontWeight.Bold) },
+                    onClick = onDismiss,
+                    colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF333333))
+                )
             }
         }
     }
 }
+
+// ── Event list picker ─────────────────────────────────────────────────────────
+
+@Composable
+private fun EventListOverlay(
+    events: List<MatchEvent>,
+    homeTeam: String,
+    awayTeam: String,
+    forDelete: Boolean,
+    onEventSelected: (MatchEvent) -> Unit,
+    onBack: () -> Unit
+) {
+    val recentEvents = remember(events) { events.takeLast(8).reversed() }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xEE000000))
+    ) {
+        ScalingLazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            item {
+                Text(
+                    text = if (forDelete) "DELETE EVENT" else "EDIT EVENT",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (forDelete) RefRed else RefGreen
+                )
+            }
+
+            if (recentEvents.isEmpty()) {
+                item { Text("No events yet", fontSize = 12.sp, color = Color.Gray) }
+            } else {
+                items(recentEvents.size) { i ->
+                    val event = recentEvents[i]
+                    val typeLabel = when (event.type) {
+                        EventType.GOAL        -> "GOAL"
+                        EventType.YELLOW_CARD -> "YC"
+                        EventType.RED_CARD    -> "RC"
+                        EventType.SIN_BIN     -> "SIN"
+                    }
+                    val typeColor = when (event.type) {
+                        EventType.GOAL        -> Color(0xFF66BB6A)
+                        EventType.YELLOW_CARD -> RefYellow
+                        EventType.RED_CARD    -> RefRed
+                        EventType.SIN_BIN     -> RefOrange
+                    }
+                    val teamAbbrev = event.team.take(4).uppercase()
+                    val playerPart = if (event.playerNumber.isNotBlank()) " #${event.playerNumber}" else ""
+                    Chip(
+                        label = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(typeLabel, color = typeColor, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                Text(
+                                    "  $teamAbbrev$playerPart  ${event.matchMinute}'",
+                                    color = Color.White,
+                                    fontSize = 11.sp
+                                )
+                            }
+                        },
+                        onClick = { onEventSelected(event) },
+                        colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF2A2A2A)),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+
+            item {
+                CompactChip(
+                    label = { Text("Back", fontWeight = FontWeight.Bold) },
+                    onClick = onBack,
+                    colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF333333))
+                )
+            }
+        }
+    }
+}
+
+// ── Edit event form ───────────────────────────────────────────────────────────
+
+@Composable
+private fun EditEventOverlay(
+    event: MatchEvent,
+    homeTeam: String,
+    awayTeam: String,
+    onSave: (team: String, playerNumber: String) -> Unit,
+    onBack: () -> Unit
+) {
+    var selectedTeam by remember { mutableStateOf(event.team) }
+    var playerNum by remember { mutableIntStateOf(event.playerNumber.toIntOrNull() ?: 0) }
+
+    // Card events use playerNumber; goals use scorerNumber — only show picker for card events
+    val showPlayerPicker = event.type == EventType.YELLOW_CARD ||
+                           event.type == EventType.RED_CARD ||
+                           event.type == EventType.SIN_BIN
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xEE000000))
+    ) {
+        ScalingLazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            item {
+                Text("EDIT EVENT", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = RefGreen)
+            }
+            item {
+                val typeLabel = when (event.type) {
+                    EventType.GOAL        -> "Goal"
+                    EventType.YELLOW_CARD -> "Yellow Card"
+                    EventType.RED_CARD    -> "Red Card"
+                    EventType.SIN_BIN     -> "Sin Bin"
+                }
+                Text(
+                    text = "$typeLabel  ${event.matchMinute}'",
+                    style = MaterialTheme.typography.caption1,
+                    color = Color.LightGray
+                )
+            }
+
+            // Team toggle
+            item {
+                Text("Team", style = MaterialTheme.typography.caption2, color = Color.Gray)
+            }
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    CompactChip(
+                        label = { Text(homeTeam.take(6), fontWeight = FontWeight.Bold) },
+                        onClick = { selectedTeam = homeTeam },
+                        colors = ChipDefaults.chipColors(
+                            backgroundColor = if (selectedTeam == homeTeam) RefGreen else Color(0xFF2A2A2A)
+                        )
+                    )
+                    CompactChip(
+                        label = { Text(awayTeam.take(6), fontWeight = FontWeight.Bold) },
+                        onClick = { selectedTeam = awayTeam },
+                        colors = ChipDefaults.chipColors(
+                            backgroundColor = if (selectedTeam == awayTeam) RefGreen else Color(0xFF2A2A2A)
+                        )
+                    )
+                }
+            }
+
+            // Player number picker — only for card/sin bin events
+            if (showPlayerPicker) {
+                item {
+                    Text("Player #", style = MaterialTheme.typography.caption2, color = Color.Gray)
+                }
+                item {
+                    PlayerNumberPicker(
+                        value = playerNum,
+                        onValueChange = { playerNum = it }
+                    )
+                }
+            }
+
+            item {
+                Chip(
+                    label = { Text("Save", fontWeight = FontWeight.Bold) },
+                    onClick = {
+                        val newPlayer = if (showPlayerPicker && playerNum > 0) "$playerNum"
+                                        else event.playerNumber
+                        onSave(selectedTeam, newPlayer)
+                    },
+                    colors = ChipDefaults.chipColors(backgroundColor = RefGreen),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+            item {
+                CompactChip(
+                    label = { Text("Back", fontWeight = FontWeight.Bold) },
+                    onClick = onBack,
+                    colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF333333))
+                )
+            }
+        }
+    }
+}
+
+// ── Delete confirmation ───────────────────────────────────────────────────────
+
+@Composable
+private fun DeleteConfirmOverlay(
+    event: MatchEvent,
+    onConfirm: () -> Unit,
+    onBack: () -> Unit
+) {
+    val typeLabel = when (event.type) {
+        EventType.GOAL        -> "Goal"
+        EventType.YELLOW_CARD -> "Yellow Card"
+        EventType.RED_CARD    -> "Red Card"
+        EventType.SIN_BIN     -> "Sin Bin"
+    }
+    val playerPart = if (event.playerNumber.isNotBlank()) " #${event.playerNumber}" else ""
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xEE000000)),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier
+                .clip(RoundedCornerShape(12.dp))
+                .background(Color(0xFF1A0000))
+                .padding(horizontal = 16.dp, vertical = 14.dp)
+        ) {
+            Text(
+                text = "DELETE?",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = RefRed
+            )
+            Text(
+                text = "$typeLabel$playerPart\n${event.team.take(8)}  ${event.matchMinute}'",
+                style = MaterialTheme.typography.caption1,
+                color = Color.LightGray,
+                textAlign = TextAlign.Center
+            )
+            Chip(
+                label = { Text("Delete", fontWeight = FontWeight.Bold) },
+                onClick = onConfirm,
+                colors = ChipDefaults.chipColors(backgroundColor = RefRed),
+                modifier = Modifier.fillMaxWidth()
+            )
+            CompactChip(
+                label = { Text("Cancel", fontWeight = FontWeight.Bold) },
+                onClick = onBack,
+                colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF333333))
+            )
+        }
+    }
+}
+
+// ── Team action page (home / away swipe pages) ────────────────────────────────
 
 @Composable
 private fun TeamActionPage(
