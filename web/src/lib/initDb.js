@@ -65,6 +65,11 @@ const MATCH_SETUPS_SCHEMA = [
   f('ical_uid',            'text'),
 ]
 
+const VENUE_CALIBRATIONS_SCHEMA = [
+  f('venue',   'text', true),
+  f('corners', 'text', true),
+]
+
 const TEMPLATES_SCHEMA = [
   f('name',                'text', true),
   f('competition',         'text'),
@@ -212,6 +217,12 @@ export async function initDb(pbUrl, email, password) {
   log.push(tRes.action === 'created'
     ? '✓ Created templates collection'
     : `✓ Updated templates (${tRes.added} field${tRes.added !== 1 ? 's' : ''} added)`)
+
+  // venue_calibrations — fully public so the web app can read/write without auth
+  const vcRes = await ensureCollection(url, token, 'venue_calibrations', VENUE_CALIBRATIONS_SCHEMA, PUBLIC_RULES)
+  log.push(vcRes.action === 'created'
+    ? '✓ Created venue_calibrations collection'
+    : `✓ Updated venue_calibrations (${vcRes.added} field${vcRes.added !== 1 ? 's' : ''} added)`)
 
   log.push('✓ matches / incidents / match_setups: fully public (watch sync works without auth)')
   return log

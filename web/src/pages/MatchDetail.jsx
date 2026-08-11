@@ -1,5 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
 import { pb } from '../lib/pb'
 import { kitStyle } from '../lib/colours'
 import { useAuth } from '../lib/auth'
@@ -273,7 +275,7 @@ export function MatchReport({ match: m, incidents = [] }) {
       {filteredTrack.length >= 2 && <SpeedZones filteredTrack={filteredTrack} />}
 
       {/* 7. GPS track */}
-      {hasGps && <PitchMapSection filteredTrack={filteredTrack} incidents={incidents} />}
+      {hasGps && <PitchMapSection filteredTrack={filteredTrack} incidents={incidents} matchVenue={m.venue} />}
 
       {/* 8. Match officials — always shown */}
       <div className="rpt-section">
@@ -537,11 +539,22 @@ function applyHomography(H, lat, lng) {
   }
 }
 
+const ESRI_TILE_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+
+function makeCornerIcon(n) {
+  return L.divIcon({
+    html: `<div class="cal-marker">${n}</div>`,
+    className: '',
+    iconSize: [26, 26],
+    iconAnchor: [13, 13],
+  })
+}
+
 const CORNER_LABELS = ['Top-left', 'Top-right', 'Bottom-right', 'Bottom-left']
-const BLANK_CORNERS = ['', '', '', '']
 
 // Parse a Google Maps coordinate string: "-34.034, 150.996" → {lat, lng} or null
 function parseCornerPair(str) {
+  if (!str) return null
   const parts = str.trim().split(',')
   if (parts.length < 2) return null
   const lat = parseFloat(parts[0].trim())
@@ -549,23 +562,118 @@ function parseCornerPair(str) {
   return (isFinite(lat) && isFinite(lng)) ? { lat, lng } : null
 }
 
-function PitchMapSection({ filteredTrack, incidents }) {
-  const [tooltip,  setTooltip]  = useState(null)
-  const [corners,  setCorners]  = useState(BLANK_CORNERS)
-  const SVG_W = 105
-  const SVG_H = 68
+function PitchMapSection({ filteredTrack, incidents, matchVenue }) {
+  const [tooltip,       setTooltip]       = useState(null)
+  const [corners,       setCorners]       = useState([null, null, null, null])
+  const [pasteVals,     setPasteVals]     = useState(['', '', '', ''])
+  const [calOpen,       setCalOpen]       = useState(false)
+  const [venueCalId,    setVenueCalId]    = useState(null)
+  const [savedForVenue, setSavedForVenue] = useState(null)
+  const [hasNewPicks,   setHasNewPicks]   = useState(false)
+  const [calSaving,     setCalSaving]     = useState(false)
+  const [calMsg,        setCalMsg]        = useState(null)
 
+  const mapDivRef  = useRef(null)
+  const leafletRef = useRef(null)
+  const markersRef = useRef([null, null, null, null])
+
+  const SVG_W = 105, SVG_H = 68
   const SVG_CORNERS = [
-    { x: 0,     y: 0     },  // TL
-    { x: SVG_W, y: 0     },  // TR
-    { x: SVG_W, y: SVG_H },  // BR
-    { x: 0,     y: SVG_H },  // BL
+    { x: 0,     y: 0      },
+    { x: SVG_W, y: 0      },
+    { x: SVG_W, y: SVG_H  },
+    { x: 0,     y: SVG_H  },
   ]
 
-  // Parse corner inputs; homography is active only when all 4 pairs are valid
-  const parsedCorners = corners.map(parseCornerPair)
-  const cornersValid  = parsedCorners.every(c => c !== null)
-  const H = cornersValid ? computeHomography(parsedCorners, SVG_CORNERS) : null
+  const cornersValid = corners.every(c => c !== null)
+  const H = cornersValid ? computeHomography(corners, SVG_CORNERS) : null
+
+  // Load venue calibration on mount
+  useEffect(() => {
+    if (!matchVenue) return
+    pb.collection('venue_calibrations')
+      .getFirstListItem(`venue = "${matchVenue.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`)
+      .then(rec => {
+        const loaded = JSON.parse(rec.corners)
+        setCorners(loaded)
+        setPasteVals(loaded.map(c => `${c.lat}, ${c.lng}`))
+        setVenueCalId(rec.id)
+        setSavedForVenue(matchVenue)
+      })
+      .catch(() => {})
+  }, [matchVenue])
+
+  // Initialise Leaflet map when the cal panel opens
+  useEffect(() => {
+    if (!calOpen || !mapDivRef.current || leafletRef.current) return
+    const div = mapDivRef.current
+    const track = filteredTrack
+
+    const map = L.map(div, { zoomControl: true })
+    L.tileLayer(ESRI_TILE_URL, { attribution: '© Esri', maxZoom: 22 }).addTo(map)
+
+    if (track.length > 0) {
+      const lats = track.map(p => p.latitude)
+      const lngs = track.map(p => p.longitude)
+      map.fitBounds(
+        [[Math.min(...lats), Math.min(...lngs)], [Math.max(...lats), Math.max(...lngs)]],
+        { padding: [30, 30] }
+      )
+    } else {
+      map.setView([-33.87, 151.21], 16)
+    }
+
+    map.on('click', e => {
+      const nextIdx = markersRef.current.findIndex(m => m === null)
+      if (nextIdx === -1) return
+      const pt = { lat: e.latlng.lat, lng: e.latlng.lng }
+      const marker = L.marker([pt.lat, pt.lng], { icon: makeCornerIcon(nextIdx + 1) }).addTo(map)
+      markersRef.current[nextIdx] = marker
+      setCorners(prev => { const n = [...prev]; n[nextIdx] = pt; return n })
+      setPasteVals(prev => { const n = [...prev]; n[nextIdx] = `${pt.lat.toFixed(7)}, ${pt.lng.toFixed(7)}`; return n })
+      setHasNewPicks(true)
+    })
+
+    leafletRef.current = map
+    return () => {
+      map.remove()
+      leafletRef.current = null
+      markersRef.current = [null, null, null, null]
+    }
+  }, [calOpen]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function clearForRepick() {
+    markersRef.current.forEach(m => m?.remove())
+    markersRef.current = [null, null, null, null]
+    setCorners([null, null, null, null])
+    setPasteVals(['', '', '', ''])
+    setSavedForVenue(null)
+    setHasNewPicks(false)
+    setCalMsg(null)
+  }
+
+  async function saveCalibration() {
+    if (!cornersValid || !matchVenue) return
+    setCalSaving(true)
+    setCalMsg(null)
+    try {
+      const data = { venue: matchVenue, corners: JSON.stringify(corners) }
+      if (venueCalId) {
+        await pb.collection('venue_calibrations').update(venueCalId, data)
+      } else {
+        const rec = await pb.collection('venue_calibrations').create(data)
+        setVenueCalId(rec.id)
+      }
+      setSavedForVenue(matchVenue)
+      setHasNewPicks(false)
+      setCalMsg({ text: 'Saved', ok: true })
+      setTimeout(() => { setCalMsg(null); setCalOpen(false) }, 1500)
+    } catch (err) {
+      setCalMsg({ text: 'Save failed: ' + err.message, ok: false })
+    } finally {
+      setCalSaving(false)
+    }
+  }
 
   const geoInc = incidents.filter(i => i.latitude && i.longitude)
   const allLats = [...filteredTrack.map(p => p.latitude), ...geoInc.map(i => i.latitude)]
@@ -573,7 +681,6 @@ function PitchMapSection({ filteredTrack, incidents }) {
 
   if (allLats.length === 0) return null
 
-  // Fallback bounds for min/max scaling (ignored when H is active)
   const rawMinLat = Math.min(...allLats), rawMaxLat = Math.max(...allLats)
   const rawMinLng = Math.min(...allLngs), rawMaxLng = Math.max(...allLngs)
   const latPad = (rawMaxLat - rawMinLat) * 0.08 || 0.0002
@@ -594,11 +701,14 @@ function PitchMapSection({ filteredTrack, incidents }) {
     }).join(' ')
   )
 
+  const placedCount = corners.filter(c => c !== null).length
+  const showSaveBtn = cornersValid && matchVenue && hasNewPicks
+
   return (
     <div className="rpt-section">
       <div className="rpt-section-label">
         GPS Track
-        {H && <span className="cal-badge">Calibrated</span>}
+        {H && <span className="cal-badge">Calibrated{!savedForVenue ? '*' : ''}</span>}
         <span className="rpt-map-legend">
           {Object.entries(INCIDENT_COLORS).map(([type, color]) => (
             <span key={type} className="rpt-legend-item">
@@ -608,12 +718,9 @@ function PitchMapSection({ filteredTrack, incidents }) {
           ))}
         </span>
       </div>
+
       <div className="pitch-map-wrap">
-        <svg
-          viewBox={`0 0 ${SVG_W} ${SVG_H}`}
-          className="pitch-svg"
-          onMouseLeave={() => setTooltip(null)}
-        >
+        <svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} className="pitch-svg" onMouseLeave={() => setTooltip(null)}>
           <rect x="0" y="0" width={SVG_W} height={SVG_H} fill="#2d5016" />
           <rect x="0.5" y="0.5" width="104" height="67" fill="none" stroke="rgba(255,255,255,.65)" strokeWidth="0.5" />
           <line x1="52.5" y1="0.5" x2="52.5" y2="67.5" stroke="rgba(255,255,255,.65)" strokeWidth="0.5" />
@@ -625,24 +732,18 @@ function PitchMapSection({ filteredTrack, incidents }) {
           <rect x="99"  y="24.84" width="5.5"  height="18.32" fill="none" stroke="rgba(255,255,255,.65)" strokeWidth="0.5" />
           <circle cx="11" cy="34" r="0.5" fill="rgba(255,255,255,.65)" />
           <circle cx="94" cy="34" r="0.5" fill="rgba(255,255,255,.65)" />
-
           {trackSegments.map((pts, idx) => (
             <polyline key={idx} points={pts} fill="none"
               stroke="rgba(255,255,255,.3)" strokeWidth="0.6"
               strokeLinejoin="round" strokeLinecap="round" />
           ))}
-
           {geoInc.map(i => {
             const { x, y } = mapPoint(i.latitude, i.longitude)
             return (
               <circle key={i.id} cx={x} cy={y} r="2.4"
-                fill={incidentDotColor(i)}
-                stroke="white" strokeWidth="0.45" opacity="0.93"
+                fill={incidentDotColor(i)} stroke="white" strokeWidth="0.45" opacity="0.93"
                 style={{ cursor: 'default' }}
-                onMouseEnter={e => setTooltip({
-                  x: e.clientX, y: e.clientY,
-                  text: `${i.minute}' ${TYPE_LABEL[i.type] ?? i.type}`,
-                })}
+                onMouseEnter={e => setTooltip({ x: e.clientX, y: e.clientY, text: `${i.minute}' ${TYPE_LABEL[i.type] ?? i.type}` })}
                 onMouseLeave={() => setTooltip(null)}
               />
             )
@@ -655,26 +756,64 @@ function PitchMapSection({ filteredTrack, incidents }) {
         )}
       </div>
 
-      <details className="cal-details">
-        <summary className="cal-summary">Calibrate corners</summary>
-        <div className="cal-grid">
-          {CORNER_LABELS.map((label, idx) => (
-            <div key={label} className="cal-row">
-              <span className="cal-label">{label}</span>
-              <input
-                className="cal-input"
-                type="text"
-                placeholder="-34.0341, 150.9965"
-                value={corners[idx]}
-                onChange={e => setCorners(prev => prev.map((v, i) => i === idx ? e.target.value : v))}
-              />
+      <div className="cal-controls">
+        <button className="cal-toggle-btn" onClick={() => setCalOpen(o => !o)}>
+          {calOpen ? '▼' : '▶'} Calibrate corners
+        </button>
+      </div>
+
+      {calOpen && (
+        <div className="cal-panel">
+          <div className="cal-status-bar">
+            {savedForVenue && !hasNewPicks
+              ? <span>Saved for <em>{savedForVenue}</em>. <button className="cal-link-btn" onClick={clearForRepick}>Clear &amp; repick</button></span>
+              : placedCount < 4
+                ? `Click corner ${placedCount + 1} of 4 on the map: ${CORNER_LABELS[placedCount]}`
+                : 'All 4 corners placed — homography active'
+            }
+            {hasNewPicks && placedCount > 0 && (
+              <button className="cal-clear-btn" onClick={clearForRepick}>Clear</button>
+            )}
+          </div>
+
+          <div ref={mapDivRef} className="cal-map" />
+
+          {showSaveBtn && (
+            <div className="cal-save-row">
+              <button className="cal-save-btn" onClick={saveCalibration} disabled={calSaving}>
+                {calSaving ? 'Saving…' : `Save for "${matchVenue}"`}
+              </button>
+              {calMsg && (
+                <span className={calMsg.ok ? 'cal-save-ok' : 'cal-save-err'}>{calMsg.text}</span>
+              )}
             </div>
-          ))}
-          <button className="cal-clear-btn" onClick={() => setCorners(BLANK_CORNERS)}>
-            Clear
-          </button>
+          )}
+
+          <details className="cal-manual">
+            <summary className="cal-summary">Enter coordinates manually</summary>
+            <div className="cal-grid">
+              {CORNER_LABELS.map((label, idx) => (
+                <div key={label} className="cal-row">
+                  <span className="cal-label">{label}</span>
+                  <input
+                    className="cal-input"
+                    type="text"
+                    placeholder="-34.0341, 150.9965"
+                    value={pasteVals[idx]}
+                    onChange={e => {
+                      const val = e.target.value
+                      setPasteVals(prev => { const n = [...prev]; n[idx] = val; return n })
+                      const parsed = parseCornerPair(val)
+                      setCorners(prev => { const n = [...prev]; n[idx] = parsed ?? null; return n })
+                      if (parseCornerPair(val)) setHasNewPicks(true)
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+          </details>
         </div>
-      </details>
+      )}
     </div>
   )
 }

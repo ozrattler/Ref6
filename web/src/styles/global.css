@@ -1305,7 +1305,46 @@ body {
   border: 1px solid #16a34a; border-radius: 4px;
   padding: 1px 5px; margin-left: 6px; vertical-align: middle;
 }
-.cal-details { margin-top: 10px; }
+.cal-controls { margin-top: 10px; }
+.cal-toggle-btn {
+  background: none; border: none; cursor: pointer; padding: 0;
+  font-size: 0.75rem; font-weight: 600; color: var(--muted);
+}
+.cal-toggle-btn:hover { color: var(--text); }
+.cal-panel { margin-top: 8px; }
+.cal-status-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 0.75rem; color: var(--muted); margin-bottom: 6px; gap: 8px;
+}
+.cal-status-bar em { font-style: normal; color: var(--text); }
+.cal-link-btn {
+  background: none; border: none; cursor: pointer; padding: 0;
+  font-size: 0.75rem; color: var(--accent); text-decoration: underline;
+}
+.cal-map {
+  height: 280px; border-radius: 6px; overflow: hidden;
+  border: 1px solid var(--border);
+}
+.cal-marker {
+  width: 26px; height: 26px; border-radius: 50%;
+  background: #f97316; color: #fff;
+  font-size: 13px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.5);
+}
+.cal-save-row {
+  display: flex; align-items: center; gap: 10px; margin-top: 8px;
+}
+.cal-save-btn {
+  font-size: 0.78rem; padding: 4px 12px;
+  background: var(--accent); color: #fff;
+  border: none; border-radius: 6px; cursor: pointer; font-weight: 600;
+}
+.cal-save-btn:disabled { opacity: 0.6; cursor: default; }
+.cal-save-btn:hover:not(:disabled) { opacity: 0.88; }
+.cal-save-ok  { font-size: 0.75rem; color: #16a34a; font-weight: 600; }
+.cal-save-err { font-size: 0.75rem; color: #ef4444; }
+.cal-manual { margin-top: 12px; }
 .cal-summary {
   font-size: 0.75rem; font-weight: 600; color: var(--muted);
   cursor: pointer; user-select: none; list-style: none;
@@ -1330,10 +1369,9 @@ details[open] .cal-summary::before { content: '▼ '; }
 }
 .cal-input:focus { outline: none; border-color: var(--accent); }
 .cal-clear-btn {
-  margin-top: 4px; align-self: flex-start;
   font-size: 0.72rem; padding: 3px 10px;
   background: transparent; border: 1px solid var(--border);
-  border-radius: 5px; color: var(--muted); cursor: pointer;
+  border-radius: 5px; color: var(--muted); cursor: pointer; white-space: nowrap;
 }
 .cal-clear-btn:hover { color: var(--text); border-color: var(--text); }
 
