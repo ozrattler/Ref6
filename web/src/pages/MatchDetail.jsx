@@ -538,7 +538,16 @@ function applyHomography(H, lat, lng) {
 }
 
 const CORNER_LABELS = ['Top-left', 'Top-right', 'Bottom-right', 'Bottom-left']
-const BLANK_CORNERS = CORNER_LABELS.map(() => ({ lat: '', lng: '' }))
+const BLANK_CORNERS = ['', '', '', '']
+
+// Parse a Google Maps coordinate string: "-34.034, 150.996" → {lat, lng} or null
+function parseCornerPair(str) {
+  const parts = str.trim().split(',')
+  if (parts.length < 2) return null
+  const lat = parseFloat(parts[0].trim())
+  const lng = parseFloat(parts.slice(1).join(',').trim())
+  return (isFinite(lat) && isFinite(lng)) ? { lat, lng } : null
+}
 
 function PitchMapSection({ filteredTrack, incidents }) {
   const [tooltip,  setTooltip]  = useState(null)
@@ -553,9 +562,9 @@ function PitchMapSection({ filteredTrack, incidents }) {
     { x: 0,     y: SVG_H },  // BL
   ]
 
-  // Parse corner inputs; homography is active only when all 4 pairs are valid numbers
-  const parsedCorners = corners.map(c => ({ lat: parseFloat(c.lat), lng: parseFloat(c.lng) }))
-  const cornersValid  = parsedCorners.every(c => isFinite(c.lat) && isFinite(c.lng))
+  // Parse corner inputs; homography is active only when all 4 pairs are valid
+  const parsedCorners = corners.map(parseCornerPair)
+  const cornersValid  = parsedCorners.every(c => c !== null)
   const H = cornersValid ? computeHomography(parsedCorners, SVG_CORNERS) : null
 
   const geoInc = incidents.filter(i => i.latitude && i.longitude)
@@ -584,10 +593,6 @@ function PitchMapSection({ filteredTrack, incidents }) {
       return `${x.toFixed(2)},${y.toFixed(2)}`
     }).join(' ')
   )
-
-  function setCornerField(idx, field, val) {
-    setCorners(prev => prev.map((c, i) => i === idx ? { ...c, [field]: val } : c))
-  }
 
   return (
     <div className="rpt-section">
@@ -659,16 +664,9 @@ function PitchMapSection({ filteredTrack, incidents }) {
               <input
                 className="cal-input"
                 type="text"
-                placeholder="lat"
-                value={corners[idx].lat}
-                onChange={e => setCornerField(idx, 'lat', e.target.value)}
-              />
-              <input
-                className="cal-input"
-                type="text"
-                placeholder="lng"
-                value={corners[idx].lng}
-                onChange={e => setCornerField(idx, 'lng', e.target.value)}
+                placeholder="-34.0341, 150.9965"
+                value={corners[idx]}
+                onChange={e => setCorners(prev => prev.map((v, i) => i === idx ? e.target.value : v))}
               />
             </div>
           ))}

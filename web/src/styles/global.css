@@ -1324,7 +1324,7 @@ details[open] .cal-summary::before { content: '▼ '; }
   font-size: 0.72rem; color: var(--muted); width: 82px; flex-shrink: 0;
 }
 .cal-input {
-  width: 110px; padding: 3px 7px; font-size: 0.75rem;
+  flex: 1; padding: 3px 7px; font-size: 0.75rem;
   background: var(--surface); border: 1px solid var(--border);
   border-radius: 5px; color: var(--text); font-family: monospace;
 }
