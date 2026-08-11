@@ -491,10 +491,72 @@ function normalizePt(lat, lng, bounds, svgW, svgH) {
   }
 }
 
+// ── Homography (DLT) ──────────────────────────────────────────────────────────
+// srcPts: [{lat,lng}×4]  dstPts: [{x,y}×4]  (clockwise TL→TR→BR→BL)
+// Returns 3×3 matrix as [[r0],[r1],[r2]], or null if degenerate.
+function computeHomography(srcPts, dstPts) {
+  const A = [], b = []
+  for (let i = 0; i < 4; i++) {
+    const sx = srcPts[i].lng, sy = srcPts[i].lat
+    const dx = dstPts[i].x,   dy = dstPts[i].y
+    A.push([-sx, -sy, -1,   0,   0,  0, sx * dx, sy * dx])
+    b.push(-dx)
+    A.push([  0,   0,  0, -sx, -sy, -1, sx * dy, sy * dy])
+    b.push(-dy)
+  }
+  // Augmented matrix [A|b], solved via Gaussian elimination with partial pivoting
+  const n = 8
+  const aug = A.map((row, i) => [...row, b[i]])
+  for (let col = 0; col < n; col++) {
+    let maxRow = col
+    for (let r = col + 1; r < n; r++) {
+      if (Math.abs(aug[r][col]) > Math.abs(aug[maxRow][col])) maxRow = r
+    }
+    ;[aug[col], aug[maxRow]] = [aug[maxRow], aug[col]]
+    const pivot = aug[col][col]
+    if (Math.abs(pivot) < 1e-10) return null
+    for (let r = 0; r < n; r++) {
+      if (r === col) continue
+      const f = aug[r][col] / pivot
+      for (let c = col; c <= n; c++) aug[r][c] -= f * aug[col][c]
+    }
+  }
+  const h = aug.map((row, i) => row[n] / row[i])
+  return [
+    [h[0], h[1], h[2]],
+    [h[3], h[4], h[5]],
+    [h[6], h[7], 1],
+  ]
+}
+
+function applyHomography(H, lat, lng) {
+  const w = H[2][0] * lng + H[2][1] * lat + H[2][2]
+  return {
+    x: (H[0][0] * lng + H[0][1] * lat + H[0][2]) / w,
+    y: (H[1][0] * lng + H[1][1] * lat + H[1][2]) / w,
+  }
+}
+
+const CORNER_LABELS = ['Top-left', 'Top-right', 'Bottom-right', 'Bottom-left']
+const BLANK_CORNERS = CORNER_LABELS.map(() => ({ lat: '', lng: '' }))
+
 function PitchMapSection({ filteredTrack, incidents }) {
-  const [tooltip, setTooltip] = useState(null)
+  const [tooltip,  setTooltip]  = useState(null)
+  const [corners,  setCorners]  = useState(BLANK_CORNERS)
   const SVG_W = 105
   const SVG_H = 68
+
+  const SVG_CORNERS = [
+    { x: 0,     y: 0     },  // TL
+    { x: SVG_W, y: 0     },  // TR
+    { x: SVG_W, y: SVG_H },  // BR
+    { x: 0,     y: SVG_H },  // BL
+  ]
+
+  // Parse corner inputs; homography is active only when all 4 pairs are valid numbers
+  const parsedCorners = corners.map(c => ({ lat: parseFloat(c.lat), lng: parseFloat(c.lng) }))
+  const cornersValid  = parsedCorners.every(c => isFinite(c.lat) && isFinite(c.lng))
+  const H = cornersValid ? computeHomography(parsedCorners, SVG_CORNERS) : null
 
   const geoInc = incidents.filter(i => i.latitude && i.longitude)
   const allLats = [...filteredTrack.map(p => p.latitude), ...geoInc.map(i => i.latitude)]
@@ -502,6 +564,7 @@ function PitchMapSection({ filteredTrack, incidents }) {
 
   if (allLats.length === 0) return null
 
+  // Fallback bounds for min/max scaling (ignored when H is active)
   const rawMinLat = Math.min(...allLats), rawMaxLat = Math.max(...allLats)
   const rawMinLng = Math.min(...allLngs), rawMaxLng = Math.max(...allLngs)
   const latPad = (rawMaxLat - rawMinLat) * 0.08 || 0.0002
@@ -511,17 +574,26 @@ function PitchMapSection({ filteredTrack, incidents }) {
     minLng: rawMinLng - lngPad, maxLng: rawMaxLng + lngPad,
   }
 
+  function mapPoint(lat, lng) {
+    return H ? applyHomography(H, lat, lng) : normalizePt(lat, lng, bounds, SVG_W, SVG_H)
+  }
+
   const trackSegments = segmentTrack(filteredTrack).map(seg =>
     seg.map(p => {
-      const { x, y } = normalizePt(p.latitude, p.longitude, bounds, SVG_W, SVG_H)
+      const { x, y } = mapPoint(p.latitude, p.longitude)
       return `${x.toFixed(2)},${y.toFixed(2)}`
     }).join(' ')
   )
+
+  function setCornerField(idx, field, val) {
+    setCorners(prev => prev.map((c, i) => i === idx ? { ...c, [field]: val } : c))
+  }
 
   return (
     <div className="rpt-section">
       <div className="rpt-section-label">
         GPS Track
+        {H && <span className="cal-badge">Calibrated</span>}
         <span className="rpt-map-legend">
           {Object.entries(INCIDENT_COLORS).map(([type, color]) => (
             <span key={type} className="rpt-legend-item">
@@ -556,7 +628,7 @@ function PitchMapSection({ filteredTrack, incidents }) {
           ))}
 
           {geoInc.map(i => {
-            const { x, y } = normalizePt(i.latitude, i.longitude, bounds, SVG_W, SVG_H)
+            const { x, y } = mapPoint(i.latitude, i.longitude)
             return (
               <circle key={i.id} cx={x} cy={y} r="2.4"
                 fill={incidentDotColor(i)}
@@ -577,6 +649,34 @@ function PitchMapSection({ filteredTrack, incidents }) {
           </div>
         )}
       </div>
+
+      <details className="cal-details">
+        <summary className="cal-summary">Calibrate corners</summary>
+        <div className="cal-grid">
+          {CORNER_LABELS.map((label, idx) => (
+            <div key={label} className="cal-row">
+              <span className="cal-label">{label}</span>
+              <input
+                className="cal-input"
+                type="text"
+                placeholder="lat"
+                value={corners[idx].lat}
+                onChange={e => setCornerField(idx, 'lat', e.target.value)}
+              />
+              <input
+                className="cal-input"
+                type="text"
+                placeholder="lng"
+                value={corners[idx].lng}
+                onChange={e => setCornerField(idx, 'lng', e.target.value)}
+              />
+            </div>
+          ))}
+          <button className="cal-clear-btn" onClick={() => setCorners(BLANK_CORNERS)}>
+            Clear
+          </button>
+        </div>
+      </details>
     </div>
   )
 }
