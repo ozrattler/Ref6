@@ -36,7 +36,8 @@ data class MatchSetupData(
     val referee: String = "",
     val ar1: String = "",
     val ar2: String = "",
-    val fourthOfficial: String = ""
+    val fourthOfficial: String = "",
+    val extraTime: Boolean = false
 )
 
 class PocketBaseSync(private val context: Context) {
@@ -131,7 +132,8 @@ class PocketBaseSync(private val context: Context) {
                     referee = item.optString("referee", ""),
                     ar1 = item.optString("ar1", ""),
                     ar2 = item.optString("ar2", ""),
-                    fourthOfficial = item.optString("fourth_official", "")
+                    fourthOfficial = item.optString("fourth_official", ""),
+                    extraTime = item.optBoolean("extra_time", false)
                 )
             }
         } catch (e: Exception) {
@@ -159,6 +161,7 @@ class PocketBaseSync(private val context: Context) {
                 put("age_group", match.ageGroup)
                 put("half_length", match.halfLengthMinutes)
                 put("status", match.status)
+                put("extra_time", match.extraTime)
                 match.matchSetupId?.let { put("match_setup_id", it) }
                 if (match.gpsTrack.isNotEmpty()) {
                     put("gps_track",        match.gpsTrack)
@@ -250,6 +253,7 @@ class PocketBaseSync(private val context: Context) {
         str.contains("U15", ignoreCase = true) -> AgeGroup.U15
         str.contains("U14", ignoreCase = true) -> AgeGroup.U14
         str.contains("U12", ignoreCase = true) -> AgeGroup.U12
+        str.contains("W12", ignoreCase = true) -> AgeGroup.U12
         else -> AgeGroup.OPEN_SENIOR
     }
 

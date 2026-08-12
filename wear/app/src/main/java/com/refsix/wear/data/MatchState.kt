@@ -1,6 +1,6 @@
 package com.refsix.wear.data
 
-enum class MatchPhase { SETUP, FIRST_HALF, HALF_TIME, SECOND_HALF, FULL_TIME }
+enum class MatchPhase { SETUP, FIRST_HALF, HALF_TIME, SECOND_HALF, EXTRA_TIME_1, EXTRA_TIME_2, FULL_TIME }
 
 enum class MatchRole { REFEREE, FOURTH_OFFICIAL }
 
@@ -85,6 +85,7 @@ data class MatchState(
     val events: List<MatchEvent> = emptyList(),
     val sinBins: List<SinBinEntry> = emptyList(),
     val cardAlert: CardAlert? = null,
+    val extraTime: Boolean = false,
     val matchSetupId: String? = null,
     val kickoffDate: String = "",
     val kickoffTime: String = "",
@@ -108,6 +109,8 @@ data class MatchState(
 ) {
     val isSpl: Boolean get() = competitionType == CompetitionType.PLM || competitionType == CompetitionType.PLR
 
+    val extraTimeHalfMinutes: Int get() = if (ageGroup == AgeGroup.U12) 5 else 10
+
     val kickOffTeam2ndHalf: String get() = when (kickOffTeam) {
         homeTeam -> awayTeam
         awayTeam -> homeTeam
@@ -119,7 +122,10 @@ data class MatchState(
         if (validSpeedCount > 0) totalValidSpeedSum / validSpeedCount else 0f
     val avgSpeedKmh: Float get() = avgSpeedMs * 3.6f
     val maxSpeedKmh: Float get() = maxSpeedMs * 3.6f
-    val halfLengthSeconds: Long get() = halfLengthMinutes * 60L
+    val halfLengthSeconds: Long get() = when (phase) {
+        MatchPhase.EXTRA_TIME_1, MatchPhase.EXTRA_TIME_2 -> extraTimeHalfMinutes * 60L
+        else -> halfLengthMinutes * 60L
+    }
     val halfRemainingSeconds: Long get() = maxOf(0L, halfLengthSeconds - halfElapsedSeconds)
     val isInAdditionalTime: Boolean get() = halfElapsedSeconds > halfLengthSeconds
     val additionalSeconds: Long get() = maxOf(0L, halfElapsedSeconds - halfLengthSeconds)
@@ -128,6 +134,10 @@ data class MatchState(
     val displayMinutes: Int get() = when (phase) {
         MatchPhase.SECOND_HALF, MatchPhase.FULL_TIME ->
             halfLengthMinutes + (halfElapsedSeconds / 60).toInt()
+        MatchPhase.EXTRA_TIME_1 ->
+            halfLengthMinutes * 2 + (halfElapsedSeconds / 60).toInt()
+        MatchPhase.EXTRA_TIME_2 ->
+            halfLengthMinutes * 2 + extraTimeHalfMinutes + (halfElapsedSeconds / 60).toInt()
         else -> (halfElapsedSeconds / 60).toInt()
     }
     val displaySeconds: Int get() = (halfElapsedSeconds % 60).toInt()
@@ -135,6 +145,10 @@ data class MatchState(
     val currentMatchMinute: Int get() = when (phase) {
         MatchPhase.SECOND_HALF, MatchPhase.FULL_TIME ->
             halfLengthMinutes + (halfElapsedSeconds / 60).toInt() + 1
+        MatchPhase.EXTRA_TIME_1 ->
+            halfLengthMinutes * 2 + (halfElapsedSeconds / 60).toInt() + 1
+        MatchPhase.EXTRA_TIME_2 ->
+            halfLengthMinutes * 2 + extraTimeHalfMinutes + (halfElapsedSeconds / 60).toInt() + 1
         else -> (halfElapsedSeconds / 60).toInt() + 1
     }
 

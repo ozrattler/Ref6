@@ -248,6 +248,8 @@ private fun MainMatchPage(
                 text = when (state.phase) {
                     MatchPhase.FIRST_HALF -> "1ST HALF"
                     MatchPhase.SECOND_HALF -> "2ND HALF"
+                    MatchPhase.EXTRA_TIME_1 -> "ET 1"
+                    MatchPhase.EXTRA_TIME_2 -> "ET 2"
                     else -> "MATCH"
                 },
                 style = MaterialTheme.typography.caption2,
@@ -360,6 +362,7 @@ private fun MainMatchPage(
                 phase = state.phase,
                 onPauseResume = { viewModel.toggleTimer(); menuState = MenuState.None },
                 onHalfTime = { menuState = MenuState.None; navController.navigate("confirmEnd/halfTime") },
+                onEtHalfTime = { menuState = MenuState.None; navController.navigate("confirmEnd/etHalfTime") },
                 onEndMatch = { menuState = MenuState.None; navController.navigate("confirmEnd/fullTime") },
                 onEditEvent = { menuState = MenuState.EventListPick(forDelete = false) },
                 onAddEvent  = { menuState = MenuState.None; navController.navigate("addEvent") },
@@ -407,6 +410,7 @@ private fun OptionsMenuOverlay(
     phase: MatchPhase,
     onPauseResume: () -> Unit,
     onHalfTime: () -> Unit,
+    onEtHalfTime: () -> Unit,
     onEndMatch: () -> Unit,
     onEditEvent: () -> Unit,
     onAddEvent: () -> Unit,
@@ -446,6 +450,16 @@ private fun OptionsMenuOverlay(
                     Chip(
                         label = { Text("Half Time", fontWeight = FontWeight.Bold) },
                         onClick = onHalfTime,
+                        colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF1A3A4A)),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+            if (phase == MatchPhase.EXTRA_TIME_1) {
+                item {
+                    Chip(
+                        label = { Text("ET Half Time", fontWeight = FontWeight.Bold) },
+                        onClick = onEtHalfTime,
                         colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF1A3A4A)),
                         modifier = Modifier.fillMaxWidth()
                     )

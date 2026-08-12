@@ -88,7 +88,9 @@ class MainActivity : ComponentActivity() {
                 LaunchedEffect(matchState.phase) {
                     val svc = Intent(context, MatchTimerService::class.java)
                     when (matchState.phase) {
-                        MatchPhase.FIRST_HALF -> context.startForegroundService(svc)
+                        MatchPhase.FIRST_HALF,
+                        MatchPhase.EXTRA_TIME_1,
+                        MatchPhase.EXTRA_TIME_2 -> context.startForegroundService(svc)
                         MatchPhase.FULL_TIME, MatchPhase.SETUP -> context.stopService(svc)
                         else -> {}
                     }
@@ -101,7 +103,8 @@ class MainActivity : ComponentActivity() {
                     currentRoute != "fullTime" &&
                     currentRoute != "report/{index}" &&
                     currentRoute != "confirmEnd/{action}" &&
-                    currentRoute != "cardConfirm"
+                    currentRoute != "cardConfirm" &&
+                    currentRoute != "extraTimeOffer"
 
                 // Vibrate and navigate on timer events
                 LaunchedEffect(Unit) {
@@ -298,6 +301,22 @@ class MainActivity : ComponentActivity() {
                             onStartSecondHalf = {
                                 navController.navigate("match") {
                                     popUpTo("match") { inclusive = true }
+                                }
+                            }
+                        )
+                    }
+
+                    composable("extraTimeOffer") {
+                        ExtraTimeOfferScreen(
+                            viewModel = matchViewModel,
+                            onStartExtraTime = {
+                                navController.navigate("match") {
+                                    popUpTo("setup") { inclusive = false }
+                                }
+                            },
+                            onEndMatch = {
+                                navController.navigate("fullTime") {
+                                    popUpTo("match") { inclusive = false }
                                 }
                             }
                         )

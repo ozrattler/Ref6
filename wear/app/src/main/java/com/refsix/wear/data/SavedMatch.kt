@@ -21,6 +21,7 @@ data class SavedMatch(
     val avgHeartRate: Int = 0,
     val maxHeartRate: Int = 0,
     val events: List<MatchEvent>,
+    val extraTime: Boolean = false,
     val pocketBaseId: String? = null,
     val matchSetupId: String? = null,
     val kickoffDate: String = "",
@@ -41,6 +42,7 @@ data class SavedMatch(
         put("ageGroup", ageGroup)
         put("competition", competition)
         put("status", status)
+        put("extraTime", extraTime)
         put("gpsTrack", gpsTrack)
         put("totalDistanceKm", totalDistanceKm.toDouble())
         put("avgSpeedKmh", avgSpeedKmh.toDouble())
@@ -103,6 +105,7 @@ data class SavedMatch(
                 ageGroup = o.optString("ageGroup", ""),
                 competition = o.optString("competition", ""),
                 status = o.optString("status", "completed"),
+                extraTime = o.optBoolean("extraTime", false),
                 gpsTrack = o.optString("gpsTrack", ""),
                 totalDistanceKm = o.optDouble("totalDistanceKm", 0.0).toFloat(),
                 avgSpeedKmh = o.optDouble("avgSpeedKmh", 0.0).toFloat(),

@@ -50,6 +50,7 @@ class MatchStorage(context: Context) {
             put("halfElapsedSeconds", state.halfElapsedSeconds)
             put("totalElapsedSeconds", state.totalElapsedSeconds)
             put("phase", state.phase.name)
+            put("extraTime", state.extraTime)
             put("matchSetupId", state.matchSetupId ?: "")
             put("kickoffDate", state.kickoffDate)
             put("kickoffTime", state.kickoffTime)
@@ -160,6 +161,7 @@ class MatchStorage(context: Context) {
             halfElapsedSeconds = obj.getLong("halfElapsedSeconds"),
             totalElapsedSeconds = obj.getLong("totalElapsedSeconds"),
             phase = MatchPhase.valueOf(obj.getString("phase")),
+            extraTime = obj.optBoolean("extraTime", false),
             matchSetupId = obj.getString("matchSetupId").ifEmpty { null },
             kickoffDate = obj.getString("kickoffDate"),
             kickoffTime = obj.getString("kickoffTime"),
@@ -191,6 +193,7 @@ class MatchStorage(context: Context) {
             ageGroup = state.gradeCode.ifEmpty { state.ageGroup.label },
             competition = state.competitionName.ifEmpty { state.competitionType.label },
             status = status,
+            extraTime = state.extraTime,
             gpsTrack = buildGpsTrackJson(state),
             totalDistanceKm = state.totalDistanceKm,
             avgSpeedKmh = state.avgSpeedKmh,

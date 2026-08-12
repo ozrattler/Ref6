@@ -210,13 +210,14 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
                         !it.isExpired(s.totalElapsedSeconds) && it.isExpired(newTotal)
                     }
                     val justReachedHalfEnd =
-                        (s.phase == MatchPhase.FIRST_HALF || s.phase == MatchPhase.SECOND_HALF) &&
+                        (s.phase == MatchPhase.FIRST_HALF || s.phase == MatchPhase.SECOND_HALF ||
+                         s.phase == MatchPhase.EXTRA_TIME_1 || s.phase == MatchPhase.EXTRA_TIME_2) &&
                         s.halfElapsedSeconds < s.halfLengthSeconds &&
                         newHalf >= s.halfLengthSeconds
                     if (justReachedHalfEnd) {
                         when (s.phase) {
-                            MatchPhase.FIRST_HALF  -> halfTimeAutoTrigger = true
-                            MatchPhase.SECOND_HALF -> fullTimeAutoTrigger = true
+                            MatchPhase.FIRST_HALF, MatchPhase.EXTRA_TIME_1 -> halfTimeAutoTrigger = true
+                            MatchPhase.SECOND_HALF, MatchPhase.EXTRA_TIME_2 -> fullTimeAutoTrigger = true
                             else -> {}
                         }
                     }
@@ -259,7 +260,9 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
             _state.map {
                 it.phase == MatchPhase.FIRST_HALF ||
                 it.phase == MatchPhase.SECOND_HALF ||
-                it.phase == MatchPhase.HALF_TIME
+                it.phase == MatchPhase.HALF_TIME ||
+                it.phase == MatchPhase.EXTRA_TIME_1 ||
+                it.phase == MatchPhase.EXTRA_TIME_2
             }.distinctUntilChanged().collect { matchActive ->
                 val nm = notificationManager ?: return@collect
                 if (!nm.isNotificationPolicyAccessGranted) return@collect
@@ -510,6 +513,30 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
         saveInProgress()
     }
 
+    fun startExtraTime() {
+        _state.update {
+            it.copy(
+                phase = MatchPhase.EXTRA_TIME_1,
+                currentHalf = 3,
+                halfElapsedSeconds = 0L,
+                isRunning = true
+            )
+        }
+        saveInProgress()
+    }
+
+    fun startExtraTime2() {
+        _state.update {
+            it.copy(
+                phase = MatchPhase.EXTRA_TIME_2,
+                currentHalf = 4,
+                halfElapsedSeconds = 0L,
+                isRunning = true
+            )
+        }
+        saveInProgress()
+    }
+
     fun callFullTime() {
         if (_state.value.phase == MatchPhase.FULL_TIME) return
         _state.update { it.copy(phase = MatchPhase.FULL_TIME, isRunning = false) }
@@ -613,6 +640,7 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
                 gradeCode = setup.gradeCode,
                 competitionName = setup.competition,
                 sinBinMinutes = setup.sinBinMinutes,
+                extraTime = setup.extraTime,
                 matchSetupId = setup.id,
                 kickoffDate = setup.kickoffDate,
                 kickoffTime = setup.kickoffTime,

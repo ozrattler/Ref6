@@ -16,12 +16,17 @@ import com.refsix.wear.ui.theme.*
 import com.refsix.wear.viewmodel.MatchViewModel
 import kotlinx.coroutines.delay
 
+private fun NavController.navigateToMatch() = navigate("match") {
+    popUpTo("match") { inclusive = true }
+}
+
 @Composable
 fun ConfirmEndMatchScreen(
     action: String,
     viewModel: MatchViewModel,
     navController: NavController
 ) {
+    val state by viewModel.state.collectAsState()
     var countdown by remember { mutableStateOf(10) }
 
     LaunchedEffect(Unit) {
@@ -36,6 +41,14 @@ fun ConfirmEndMatchScreen(
     }
 
     val isFullTime = action == "fullTime"
+    val isEtHalfTime = action == "etHalfTime"
+
+    val titleText = when {
+        isFullTime   -> "END MATCH?"
+        isEtHalfTime -> "END ET HALF?"
+        else         -> "HALF TIME?"
+    }
+    val titleColor = if (isFullTime) RefRed else Color(0xFF9C27B0)
 
     Box(
         modifier = Modifier
@@ -49,10 +62,10 @@ fun ConfirmEndMatchScreen(
             modifier = Modifier.padding(horizontal = 16.dp)
         ) {
             Text(
-                text = if (isFullTime) "END MATCH?" else "HALF TIME?",
+                text = titleText,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
-                color = if (isFullTime) RefRed else Color(0xFF9C27B0),
+                color = titleColor,
                 textAlign = TextAlign.Center
             )
 
@@ -71,21 +84,32 @@ fun ConfirmEndMatchScreen(
             Chip(
                 label = { Text("CONFIRM", fontWeight = FontWeight.Bold) },
                 onClick = {
-                    if (isFullTime) {
-                        viewModel.callFullTime()
-                        navController.navigate("fullTime") {
-                            popUpTo("match") { inclusive = false }
+                    when {
+                        isFullTime -> {
+                            if (state.extraTime && state.homeScore == state.awayScore) {
+                                navController.navigate("extraTimeOffer") {
+                                    popUpTo("match") { inclusive = false }
+                                }
+                            } else {
+                                viewModel.callFullTime()
+                                navController.navigate("fullTime") {
+                                    popUpTo("match") { inclusive = false }
+                                }
+                            }
                         }
-                    } else {
-                        viewModel.callHalfTime()
-                        navController.navigate("halfTime") {
-                            popUpTo("match") { inclusive = false }
+                        isEtHalfTime -> {
+                            viewModel.startExtraTime2()
+                            navController.navigateToMatch()
+                        }
+                        else -> {
+                            viewModel.callHalfTime()
+                            navController.navigate("halfTime") {
+                                popUpTo("match") { inclusive = false }
+                            }
                         }
                     }
                 },
-                colors = ChipDefaults.chipColors(
-                    backgroundColor = if (isFullTime) RefRed else Color(0xFF9C27B0)
-                ),
+                colors = ChipDefaults.chipColors(backgroundColor = titleColor),
                 modifier = Modifier.fillMaxWidth()
             )
 
