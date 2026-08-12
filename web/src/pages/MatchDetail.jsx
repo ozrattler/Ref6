@@ -97,7 +97,9 @@ function fmtZoneTime(secs) {
   return m > 0 ? `${m}m ${s}s` : `${s}s`
 }
 
-function incidentDotColor(i) {
+// teamColour: optional fn(teamName) → hex string for the scoring team's kit
+function incidentDotColor(i, teamColour = () => null) {
+  if (i.type === 'GOAL') return teamColour(i.team) || INCIDENT_COLORS.GOAL
   if (i.type === 'SIN_BIN') return '#f97316'
   // dissent yellows are functionally sin-bins — show in the same orange
   if (i.type === 'YELLOW_CARD' && i.offence_description === 'Dissent') return '#f97316'
@@ -275,7 +277,9 @@ export function MatchReport({ match: m, incidents = [] }) {
       {filteredTrack.length >= 2 && <SpeedZones filteredTrack={filteredTrack} />}
 
       {/* 7. GPS track */}
-      {hasGps && <PitchMapSection filteredTrack={filteredTrack} incidents={incidents} matchVenue={m.venue} />}
+      {hasGps && <PitchMapSection filteredTrack={filteredTrack} incidents={incidents} matchVenue={m.venue}
+        homeTeam={m.home_team} homeColour={m.home_colour}
+        awayTeam={m.away_team} awayColour={m.away_colour} />}
 
       {/* 8. Match officials — always shown */}
       <div className="rpt-section">
@@ -562,7 +566,7 @@ function parseCornerPair(str) {
   return (isFinite(lat) && isFinite(lng)) ? { lat, lng } : null
 }
 
-function PitchMapSection({ filteredTrack, incidents, matchVenue }) {
+function PitchMapSection({ filteredTrack, incidents, matchVenue, homeTeam, homeColour, awayTeam, awayColour }) {
   const [tooltip,       setTooltip]       = useState(null)
   const [corners,       setCorners]       = useState([null, null, null, null])
   const [pasteVals,     setPasteVals]     = useState(['', '', '', ''])
@@ -702,6 +706,12 @@ function PitchMapSection({ filteredTrack, incidents, matchVenue }) {
   )
 
   const placedCount = corners.filter(c => c !== null).length
+  function teamColour(team) {
+    if (homeColour && sameTeam(team, homeTeam)) return homeColour
+    if (awayColour && sameTeam(team, awayTeam)) return awayColour
+    return null
+  }
+
   const showSaveBtn = cornersValid && matchVenue && hasNewPicks
 
   return (
@@ -741,7 +751,7 @@ function PitchMapSection({ filteredTrack, incidents, matchVenue }) {
             const { x, y } = mapPoint(i.latitude, i.longitude)
             return (
               <circle key={i.id} cx={x} cy={y} r="2.4"
-                fill={incidentDotColor(i)} stroke="white" strokeWidth="0.45" opacity="0.93"
+                fill={incidentDotColor(i, teamColour)} stroke="white" strokeWidth="0.45" opacity="0.93"
                 style={{ cursor: 'default' }}
                 onMouseEnter={e => setTooltip({ x: e.clientX, y: e.clientY, text: `${i.minute}' ${TYPE_LABEL[i.type] ?? i.type}` })}
                 onMouseLeave={() => setTooltip(null)}
