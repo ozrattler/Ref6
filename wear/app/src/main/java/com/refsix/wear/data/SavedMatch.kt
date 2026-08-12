@@ -14,6 +14,8 @@ data class SavedMatch(
     val ageGroup: String = "",
     val competition: String = "",
     val status: String = "completed",
+    val homeColour: String = "",
+    val awayColour: String = "",
     val gpsTrack: String = "",
     val totalDistanceKm: Float = 0f,
     val avgSpeedKmh: Float = 0f,
@@ -42,6 +44,8 @@ data class SavedMatch(
         put("ageGroup", ageGroup)
         put("competition", competition)
         put("status", status)
+        if (homeColour.isNotEmpty()) put("homeColour", homeColour)
+        if (awayColour.isNotEmpty()) put("awayColour", awayColour)
         put("extraTime", extraTime)
         put("gpsTrack", gpsTrack)
         put("totalDistanceKm", totalDistanceKm.toDouble())
@@ -105,6 +109,8 @@ data class SavedMatch(
                 ageGroup = o.optString("ageGroup", ""),
                 competition = o.optString("competition", ""),
                 status = o.optString("status", "completed"),
+                homeColour = o.optString("homeColour", ""),
+                awayColour = o.optString("awayColour", ""),
                 extraTime = o.optBoolean("extraTime", false),
                 gpsTrack = o.optString("gpsTrack", ""),
                 totalDistanceKm = o.optDouble("totalDistanceKm", 0.0).toFloat(),

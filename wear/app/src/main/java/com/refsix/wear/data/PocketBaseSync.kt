@@ -173,10 +173,12 @@ class PocketBaseSync(private val context: Context) {
                     put("avg_heart_rate", match.avgHeartRate)
                     put("max_heart_rate", match.maxHeartRate)
                 }
-                if (match.referee.isNotEmpty())       put("referee",         match.referee)
-                if (match.ar1.isNotEmpty())           put("ar1",             match.ar1)
-                if (match.ar2.isNotEmpty())           put("ar2",             match.ar2)
-                if (match.fourthOfficial.isNotEmpty()) put("fourth_official", match.fourthOfficial)
+                if (match.homeColour.isNotEmpty())      put("home_colour",     match.homeColour)
+                if (match.awayColour.isNotEmpty())      put("away_colour",     match.awayColour)
+                if (match.referee.isNotEmpty())         put("referee",         match.referee)
+                if (match.ar1.isNotEmpty())             put("ar1",             match.ar1)
+                if (match.ar2.isNotEmpty())             put("ar2",             match.ar2)
+                if (match.fourthOfficial.isNotEmpty())  put("fourth_official", match.fourthOfficial)
             }
             Log.i(TAG, "syncMatch: POST $baseUrl/matches/records")
             val (matchHttpCode, pbMatchId) = postJson("$baseUrl/matches/records", matchBody)

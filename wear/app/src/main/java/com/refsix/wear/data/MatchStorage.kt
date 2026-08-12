@@ -193,6 +193,8 @@ class MatchStorage(context: Context) {
             ageGroup = state.gradeCode.ifEmpty { state.ageGroup.label },
             competition = state.competitionName.ifEmpty { state.competitionType.label },
             status = status,
+            homeColour = state.homeColour,
+            awayColour = state.awayColour,
             extraTime = state.extraTime,
             gpsTrack = buildGpsTrackJson(state),
             totalDistanceKm = state.totalDistanceKm,

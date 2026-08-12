@@ -697,9 +697,15 @@ function PitchMapSection({ filteredTrack, incidents, matchVenue, homeTeam, homeC
 
   // Resolve every incident to a map position: own coords if available, else
   // nearest track point by match_time. Drop only if no track exists and no coords.
+  // Annotate each item with _stackIdx/_stackTotal so overlapping dots can be offset.
+  const STACK_R = 3.5  // SVG units — radius of the fan for stacked markers
   const geoInc = incidents.flatMap(i => {
     const pos = resolveIncidentLatLng(i, filteredTrack)
     return pos ? [{ ...i, _lat: pos.lat, _lng: pos.lng }] : []
+  }).map((inc, _idx, arr) => {
+    const total = arr.filter(j => j._lat === inc._lat && j._lng === inc._lng).length
+    const stackIdx = arr.slice(0, _idx).filter(j => j._lat === inc._lat && j._lng === inc._lng).length
+    return { ...inc, _stackTotal: total, _stackIdx: stackIdx }
   })
   const allLats = [...filteredTrack.map(p => p.latitude), ...geoInc.map(i => i._lat)]
   const allLngs = [...filteredTrack.map(p => p.longitude), ...geoInc.map(i => i._lng)]
@@ -769,9 +775,15 @@ function PitchMapSection({ filteredTrack, incidents, matchVenue, homeTeam, homeC
               strokeLinejoin="round" strokeLinecap="round" />
           ))}
           {geoInc.map(i => {
-            const { x, y } = mapPoint(i._lat, i._lng)
+            const base = mapPoint(i._lat, i._lng)
+            let cx = base.x, cy = base.y
+            if (i._stackTotal > 1) {
+              const angle = (i._stackIdx / i._stackTotal) * 2 * Math.PI - Math.PI / 2
+              cx += Math.cos(angle) * STACK_R
+              cy += Math.sin(angle) * STACK_R
+            }
             return (
-              <circle key={i.id} cx={x} cy={y} r="2.4"
+              <circle key={i.id} cx={cx.toFixed(2)} cy={cy.toFixed(2)} r="2.4"
                 fill={incidentDotColor(i, teamColour)} stroke="white" strokeWidth="0.45" opacity="0.93"
                 style={{ cursor: 'default' }}
                 onMouseEnter={e => setTooltip({ x: e.clientX, y: e.clientY, text: `${i.minute}' ${TYPE_LABEL[i.type] ?? i.type}` })}
