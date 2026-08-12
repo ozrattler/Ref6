@@ -513,6 +513,11 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
         saveInProgress()
     }
 
+    fun prepareEtHalfBreak() {
+        _state.update { it.copy(isRunning = false) }
+        saveInProgress()
+    }
+
     fun startExtraTime() {
         _state.update {
             it.copy(

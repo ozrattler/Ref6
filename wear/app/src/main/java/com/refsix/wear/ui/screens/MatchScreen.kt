@@ -515,7 +515,7 @@ private fun OptionsMenuOverlay(
 // ── Event list picker ─────────────────────────────────────────────────────────
 
 @Composable
-private fun EventListOverlay(
+internal fun EventListOverlay(
     events: List<MatchEvent>,
     homeTeam: String,
     awayTeam: String,
@@ -596,7 +596,7 @@ private fun EventListOverlay(
 // ── Edit event form ───────────────────────────────────────────────────────────
 
 @Composable
-private fun EditEventOverlay(
+internal fun EditEventOverlay(
     event: MatchEvent,
     homeTeam: String,
     awayTeam: String,
@@ -768,7 +768,7 @@ private fun EditEventOverlay(
 // ── Delete confirmation ───────────────────────────────────────────────────────
 
 @Composable
-private fun DeleteConfirmOverlay(
+internal fun DeleteConfirmOverlay(
     event: MatchEvent,
     onConfirm: () -> Unit,
     onBack: () -> Unit

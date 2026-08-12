@@ -104,7 +104,8 @@ class MainActivity : ComponentActivity() {
                     currentRoute != "report/{index}" &&
                     currentRoute != "confirmEnd/{action}" &&
                     currentRoute != "cardConfirm" &&
-                    currentRoute != "extraTimeOffer"
+                    currentRoute != "extraTimeOffer" &&
+                    currentRoute != "etHalfBreak"
 
                 // Vibrate and navigate on timer events
                 LaunchedEffect(Unit) {
@@ -289,6 +290,7 @@ class MainActivity : ComponentActivity() {
                     composable("halfTime") {
                         HalfTimeScreen(
                             viewModel = matchViewModel,
+                            navController = navController,
                             onStopHalfTimeBreak = {
                                 navController.navigate("kickOff2ndHalf")
                             }
@@ -309,6 +311,7 @@ class MainActivity : ComponentActivity() {
                     composable("extraTimeOffer") {
                         ExtraTimeOfferScreen(
                             viewModel = matchViewModel,
+                            navController = navController,
                             onStartExtraTime = {
                                 navController.navigate("match") {
                                     popUpTo("setup") { inclusive = false }
@@ -322,9 +325,29 @@ class MainActivity : ComponentActivity() {
                         )
                     }
 
+                    composable("etHalfBreak") {
+                        ETHalfBreakScreen(
+                            viewModel = matchViewModel,
+                            navController = navController,
+                            onStartEt2 = {
+                                navController.navigate("match") {
+                                    popUpTo("match") { inclusive = true }
+                                }
+                            }
+                        )
+                    }
+
+                    composable("manageEvents") {
+                        ManageEventsScreen(
+                            viewModel = matchViewModel,
+                            navController = navController
+                        )
+                    }
+
                     composable("fullTime") {
                         FullTimeScreen(
                             viewModel = matchViewModel,
+                            navController = navController,
                             onNewMatch = {
                                 navController.navigate("setup") {
                                     popUpTo(0) { inclusive = true }

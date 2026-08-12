@@ -98,8 +98,10 @@ fun ConfirmEndMatchScreen(
                             }
                         }
                         isEtHalfTime -> {
-                            viewModel.startExtraTime2()
-                            navController.navigateToMatch()
+                            viewModel.prepareEtHalfBreak()
+                            navController.navigate("etHalfBreak") {
+                                popUpTo("match") { inclusive = false }
+                            }
                         }
                         else -> {
                             viewModel.callHalfTime()

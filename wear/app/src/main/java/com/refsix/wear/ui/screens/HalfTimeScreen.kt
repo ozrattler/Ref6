@@ -8,6 +8,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavController
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.material.*
 import com.refsix.wear.data.EventType
@@ -16,7 +17,11 @@ import com.refsix.wear.ui.theme.*
 import com.refsix.wear.viewmodel.MatchViewModel
 
 @Composable
-fun HalfTimeScreen(viewModel: MatchViewModel, onStopHalfTimeBreak: () -> Unit) {
+fun HalfTimeScreen(
+    viewModel: MatchViewModel,
+    navController: NavController,
+    onStopHalfTimeBreak: () -> Unit
+) {
     val state by viewModel.state.collectAsState()
     val countdown by viewModel.halfTimeCountdown.collectAsState()
 
@@ -94,7 +99,13 @@ fun HalfTimeScreen(viewModel: MatchViewModel, onStopHalfTimeBreak: () -> Unit) {
             }
         } else {
             items(firstHalfEvents.size) { i ->
-                EventItem(firstHalfEvents[i])
+                EventItem(
+                    event = firstHalfEvents[i],
+                    homeTeam = state.homeTeam,
+                    homeColour = state.homeColour,
+                    awayTeam = state.awayTeam,
+                    awayColour = state.awayColour
+                )
             }
         }
 
@@ -108,6 +119,13 @@ fun HalfTimeScreen(viewModel: MatchViewModel, onStopHalfTimeBreak: () -> Unit) {
                 modifier = Modifier.fillMaxWidth()
             )
         }
+        item {
+            CompactChip(
+                label = { Text("Events", fontWeight = FontWeight.Bold) },
+                onClick = { navController.navigate("manageEvents") },
+                colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF2A2A2A))
+            )
+        }
     }
 }
 
@@ -116,11 +134,22 @@ fun HalfTimeScreen(viewModel: MatchViewModel, onStopHalfTimeBreak: () -> Unit) {
 @Composable
 internal fun EventItem(
     event: MatchEvent,
+    homeTeam: String = "",
+    homeColour: String = "",
+    awayTeam: String = "",
+    awayColour: String = "",
     mainFontSp: Float = 13f,
     detailFontSp: Float = 11f
 ) {
     val (abbrev, color) = when (event.type) {
-        EventType.GOAL -> "G" to RefGreen
+        EventType.GOAL -> {
+            val kitColor = when (event.team) {
+                homeTeam -> homeColour.toKitColor()
+                awayTeam -> awayColour.toKitColor()
+                else -> null
+            }
+            "G" to (kitColor ?: RefGreen)
+        }
         EventType.YELLOW_CARD -> "YC" to RefYellow
         EventType.RED_CARD -> "RC" to RefRed
         EventType.SIN_BIN -> "SB" to RefOrange

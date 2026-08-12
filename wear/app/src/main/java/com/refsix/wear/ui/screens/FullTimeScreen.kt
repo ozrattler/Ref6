@@ -8,6 +8,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavController
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.material.*
 import com.refsix.wear.data.EventType
@@ -16,7 +17,7 @@ import com.refsix.wear.ui.theme.*
 import com.refsix.wear.viewmodel.MatchViewModel
 
 @Composable
-fun FullTimeScreen(viewModel: MatchViewModel, onNewMatch: () -> Unit) {
+fun FullTimeScreen(viewModel: MatchViewModel, navController: NavController, onNewMatch: () -> Unit) {
     val state by viewModel.state.collectAsState()
 
     val allEvents = remember(state.events) { state.events.sortedBy { it.matchMinute } }
@@ -92,12 +93,27 @@ fun FullTimeScreen(viewModel: MatchViewModel, onNewMatch: () -> Unit) {
             }
         } else {
             items(allEvents.size) { i ->
-                // Larger fonts for readability on the report screen
-                EventItem(event = allEvents[i], mainFontSp = 15f, detailFontSp = 13f)
+                EventItem(
+                    event = allEvents[i],
+                    homeTeam = state.homeTeam,
+                    homeColour = state.homeColour,
+                    awayTeam = state.awayTeam,
+                    awayColour = state.awayColour,
+                    mainFontSp = 15f,
+                    detailFontSp = 13f
+                )
             }
         }
 
         item { Spacer(modifier = Modifier.height(4.dp)) }
+
+        item {
+            CompactChip(
+                label = { Text("Events", fontWeight = FontWeight.Bold) },
+                onClick = { navController.navigate("manageEvents") },
+                colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF2A2A2A))
+            )
+        }
 
         item {
             Chip(

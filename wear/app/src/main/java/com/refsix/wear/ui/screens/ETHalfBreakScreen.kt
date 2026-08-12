@@ -15,14 +15,12 @@ import com.refsix.wear.ui.theme.*
 import com.refsix.wear.viewmodel.MatchViewModel
 
 @Composable
-fun ExtraTimeOfferScreen(
+fun ETHalfBreakScreen(
     viewModel: MatchViewModel,
     navController: NavController,
-    onStartExtraTime: () -> Unit,
-    onEndMatch: () -> Unit
+    onStartEt2: () -> Unit
 ) {
     val state by viewModel.state.collectAsState()
-    val etMinutes = state.extraTimeHalfMinutes
 
     ScalingLazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -32,7 +30,7 @@ fun ExtraTimeOfferScreen(
     ) {
         item {
             Text(
-                text = "EXTRA TIME?",
+                text = "ET HALF TIME",
                 style = MaterialTheme.typography.title3,
                 color = RefYellow,
                 fontWeight = FontWeight.Bold
@@ -55,33 +53,15 @@ fun ExtraTimeOfferScreen(
                 Text(state.awayTeam.take(4), style = MaterialTheme.typography.caption1, color = Color.Gray)
             }
         }
-        item {
-            Text(
-                text = "2 × $etMinutes min",
-                style = MaterialTheme.typography.caption1,
-                color = Color.LightGray
-            )
-        }
         item { Spacer(modifier = Modifier.height(4.dp)) }
         item {
             Chip(
-                label = { Text("Start ET", fontWeight = FontWeight.Bold) },
+                label = { Text("Start ET Half 2", fontWeight = FontWeight.Bold) },
                 onClick = {
-                    viewModel.startExtraTime()
-                    onStartExtraTime()
+                    viewModel.startExtraTime2()
+                    onStartEt2()
                 },
                 colors = ChipDefaults.chipColors(backgroundColor = RefGreen),
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-        item {
-            Chip(
-                label = { Text("End Match", fontWeight = FontWeight.Bold) },
-                onClick = {
-                    viewModel.callFullTime()
-                    onEndMatch()
-                },
-                colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF4A1A1A)),
                 modifier = Modifier.fillMaxWidth()
             )
         }
