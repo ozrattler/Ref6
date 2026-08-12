@@ -589,8 +589,10 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
         if (hasNetwork) {
             val setups = pocketBaseSync.fetchPendingMatchSetups()
             if (setups != null) {
-                Log.d("MatchViewModel", "refreshPendingSetup: ${setups.size} pending setups")
-                _pendingSetups.value = setups
+                val playedSetupIds = _savedMatches.value.mapNotNull { it.matchSetupId }.toSet()
+                val filtered = setups.filter { it.id !in playedSetupIds }
+                Log.d("MatchViewModel", "refreshPendingSetup: ${setups.size} from server, ${filtered.size} after filtering played")
+                _pendingSetups.value = filtered
             } else {
                 Log.w("MatchViewModel", "refreshPendingSetup: fetch failed, keeping existing list")
             }
