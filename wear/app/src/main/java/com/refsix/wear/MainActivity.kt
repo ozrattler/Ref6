@@ -244,8 +244,16 @@ class MainActivity : ComponentActivity() {
                         CardConfirmScreen(
                             viewModel = matchViewModel,
                             onConfirm = {
-                                navController.navigate("match") {
-                                    popUpTo("setup") { inclusive = false }
+                                // Pop back to "addEvent" (inclusive) when the card was added via
+                                // the manage-events flow (HT/FT/ET editing). If "addEvent" is not
+                                // in the stack (live-play TeamActionPage path), fall through to
+                                // the standard navigate("match").
+                                val returnedToEventContext =
+                                    navController.popBackStack("addEvent", inclusive = true)
+                                if (!returnedToEventContext) {
+                                    navController.navigate("match") {
+                                        popUpTo("setup") { inclusive = false }
+                                    }
                                 }
                                 matchViewModel.signalReturnToCenter()
                             },
