@@ -12,6 +12,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.wear.compose.material.*
+import com.refsix.wear.data.MatchPhase
 import com.refsix.wear.ui.theme.*
 import com.refsix.wear.viewmodel.MatchViewModel
 import kotlinx.coroutines.delay
@@ -86,7 +87,8 @@ fun ConfirmEndMatchScreen(
                 onClick = {
                     when {
                         isFullTime -> {
-                            if (state.extraTime && state.homeScore == state.awayScore) {
+                            if (state.extraTime && state.homeScore == state.awayScore &&
+                                state.phase == MatchPhase.SECOND_HALF) {
                                 navController.navigate("extraTimeOffer") {
                                     popUpTo("match") { inclusive = false }
                                 }

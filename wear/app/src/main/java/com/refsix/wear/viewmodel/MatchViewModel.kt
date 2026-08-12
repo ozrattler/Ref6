@@ -621,14 +621,17 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
         if (hasNetwork) {
             val setups = pocketBaseSync.fetchPendingMatchSetups()
             if (setups != null) {
-                val playedSetupIds = _savedMatches.value.mapNotNull { it.matchSetupId }.toSet()
-                val filtered = setups.filter { it.id !in playedSetupIds }
-                Log.d("MatchViewModel", "refreshPendingSetup: ${setups.size} from server, ${filtered.size} after filtering played")
-                _pendingSetups.value = filtered
+                Log.d("MatchViewModel", "refreshPendingSetup: ${setups.size} from server")
+                _pendingSetups.value = setups
             } else {
                 Log.w("MatchViewModel", "refreshPendingSetup: fetch failed, keeping existing list")
             }
         }
+        // Always filter against local history — covers airplane mode and fetch failures
+        val playedSetupIds = _savedMatches.value.mapNotNull { it.matchSetupId }.toSet()
+        val before = _pendingSetups.value.size
+        _pendingSetups.value = _pendingSetups.value.filter { it.id !in playedSetupIds }
+        Log.d("MatchViewModel", "refreshPendingSetup: $before → ${_pendingSetups.value.size} after filtering played")
         _isFetchingSetups.value = false
     }
 
@@ -756,19 +759,20 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
                 cardType == CardType.YELLOW &&
                     offence == Offences.DISSENT -> {
                     newEvents = s.events + cardEvent
-                    updatedSinBins = s.sinBins + SinBinEntry(
+                    updatedSinBins = if (playerNumber == "Coach") s.sinBins else s.sinBins + SinBinEntry(
                         team = team,
                         playerNumber = playerNumber,
                         offence = "Dissent",
                         startElapsedSeconds = s.totalElapsedSeconds,
                         durationSeconds = s.sinBinDurationSeconds
                     )
-                    alert = CardAlert(team, playerNumber, CardAlertType.DISSENT_SIN_BIN, s.sinBinMinutes)
+                    alert = if (playerNumber == "Coach") s.cardAlert
+                            else CardAlert(team, playerNumber, CardAlertType.DISSENT_SIN_BIN, s.sinBinMinutes)
                 }
 
                 cardType == CardType.SIN_BIN -> {
                     newEvents = s.events + cardEvent
-                    updatedSinBins = s.sinBins + SinBinEntry(
+                    updatedSinBins = if (playerNumber == "Coach") s.sinBins else s.sinBins + SinBinEntry(
                         team = team,
                         playerNumber = playerNumber,
                         offence = offence,

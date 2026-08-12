@@ -22,9 +22,7 @@ fun AddEventScreen(
     val state by viewModel.state.collectAsState()
 
     fun backToMatch() {
-        navController.navigate("match") {
-            popUpTo("setup") { inclusive = false }
-        }
+        navController.popBackStack()
     }
 
     ScalingLazyColumn(
