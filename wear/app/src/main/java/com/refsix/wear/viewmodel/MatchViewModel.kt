@@ -243,7 +243,6 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
                     _sinBinAlert.value = justExpired.last().let { it.team to it.playerNumber }
                 }
                 if (halfTimeAutoTrigger) {
-                    callHalfTime()
                     _uiEvents.tryEmit(MatchUiEvent.HalfTimeAlert)
                 }
                 if (fullTimeAutoTrigger) {

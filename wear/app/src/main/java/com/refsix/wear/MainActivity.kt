@@ -122,9 +122,7 @@ class MainActivity : ComponentActivity() {
                                         -1
                                     )
                                 )
-                                navController.navigate("halfTime") {
-                                    popUpTo("match") { inclusive = false }
-                                }
+                                // Timer keeps running — referee taps "Half Time" in Options to transition
                             }
                             is MatchUiEvent.FullTimeAutoReached -> {
                                 vibrator?.vibrate(
@@ -133,10 +131,7 @@ class MainActivity : ComponentActivity() {
                                         -1
                                     )
                                 )
-                                matchViewModel.callFullTime()
-                                navController.navigate("fullTime") {
-                                    popUpTo("match") { inclusive = false }
-                                }
+                                // Timer keeps running — referee taps "End Match" in Options to transition
                             }
                             is MatchUiEvent.FullTimeAlert -> {
                                 vibrator?.vibrate(

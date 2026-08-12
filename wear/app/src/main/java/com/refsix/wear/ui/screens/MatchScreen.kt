@@ -283,7 +283,7 @@ private fun MainMatchPage(
                         state.additionalSeconds / 60,
                         state.additionalSeconds % 60
                     ),
-                    fontSize = 12.sp,
+                    fontSize = 26.sp,
                     color = RefYellow,
                     fontWeight = FontWeight.Bold
                 )
@@ -324,9 +324,9 @@ private fun MainMatchPage(
                                 text = "${if (bin.playerNumber == "Coach") "Coach" else "#${bin.playerNumber}"} %02d:%02d".format(
                                     remaining / 60, remaining % 60
                                 ),
-                                fontSize = 11.sp,
-                                fontWeight = if (remaining < 60) FontWeight.Bold else FontWeight.Normal,
-                                color = if (remaining < 60) RefRed else RefOrange
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (remaining < 60) RefRed else RefYellow
                             )
                         }
                     }
@@ -340,9 +340,9 @@ private fun MainMatchPage(
                                 text = "${if (bin.playerNumber == "Coach") "Coach" else "#${bin.playerNumber}"} %02d:%02d".format(
                                     remaining / 60, remaining % 60
                                 ),
-                                fontSize = 11.sp,
-                                fontWeight = if (remaining < 60) FontWeight.Bold else FontWeight.Normal,
-                                color = if (remaining < 60) RefRed else RefOrange,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (remaining < 60) RefRed else RefYellow,
                                 textAlign = TextAlign.End
                             )
                         }
@@ -357,7 +357,9 @@ private fun MainMatchPage(
 
             MenuState.Options -> OptionsMenuOverlay(
                 isRunning = state.isRunning,
+                phase = state.phase,
                 onPauseResume = { viewModel.toggleTimer(); menuState = MenuState.None },
+                onHalfTime = { menuState = MenuState.None; navController.navigate("confirmEnd/halfTime") },
                 onEndMatch = { menuState = MenuState.None; navController.navigate("confirmEnd/fullTime") },
                 onEditEvent = { menuState = MenuState.EventListPick(forDelete = false) },
                 onAddEvent  = { menuState = MenuState.None; navController.navigate("addEvent") },
@@ -402,7 +404,9 @@ private fun MainMatchPage(
 @Composable
 private fun OptionsMenuOverlay(
     isRunning: Boolean,
+    phase: MatchPhase,
     onPauseResume: () -> Unit,
+    onHalfTime: () -> Unit,
     onEndMatch: () -> Unit,
     onEditEvent: () -> Unit,
     onAddEvent: () -> Unit,
@@ -436,6 +440,16 @@ private fun OptionsMenuOverlay(
                     colors = ChipDefaults.chipColors(backgroundColor = RefBlue),
                     modifier = Modifier.fillMaxWidth()
                 )
+            }
+            if (phase == MatchPhase.FIRST_HALF) {
+                item {
+                    Chip(
+                        label = { Text("Half Time", fontWeight = FontWeight.Bold) },
+                        onClick = onHalfTime,
+                        colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF1A3A4A)),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
             item {
                 Chip(
