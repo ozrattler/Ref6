@@ -97,6 +97,22 @@ function fmtZoneTime(secs) {
   return m > 0 ? `${m}m ${s}s` : `${s}s`
 }
 
+// Return the best lat/lng for an incident: its own coords if present, else
+// the nearest GPS track point by match_time vs minute.
+function resolveIncidentLatLng(incident, track) {
+  if (incident.latitude && incident.longitude) {
+    return { lat: incident.latitude, lng: incident.longitude }
+  }
+  if (!track.length) return null
+  const minute = incident.minute ?? 0
+  let best = track[0], bestDiff = Math.abs((track[0].match_time ?? 0) - minute)
+  for (let i = 1; i < track.length; i++) {
+    const diff = Math.abs((track[i].match_time ?? 0) - minute)
+    if (diff < bestDiff) { bestDiff = diff; best = track[i] }
+  }
+  return { lat: best.latitude, lng: best.longitude }
+}
+
 // teamColour: optional fn(teamName) → hex string for the scoring team's kit
 function incidentDotColor(i, teamColour = () => null) {
   if (i.type === 'GOAL') return teamColour(i.team) || INCIDENT_COLORS.GOAL
@@ -679,9 +695,14 @@ function PitchMapSection({ filteredTrack, incidents, matchVenue, homeTeam, homeC
     }
   }
 
-  const geoInc = incidents.filter(i => i.latitude && i.longitude)
-  const allLats = [...filteredTrack.map(p => p.latitude), ...geoInc.map(i => i.latitude)]
-  const allLngs = [...filteredTrack.map(p => p.longitude), ...geoInc.map(i => i.longitude)]
+  // Resolve every incident to a map position: own coords if available, else
+  // nearest track point by match_time. Drop only if no track exists and no coords.
+  const geoInc = incidents.flatMap(i => {
+    const pos = resolveIncidentLatLng(i, filteredTrack)
+    return pos ? [{ ...i, _lat: pos.lat, _lng: pos.lng }] : []
+  })
+  const allLats = [...filteredTrack.map(p => p.latitude), ...geoInc.map(i => i._lat)]
+  const allLngs = [...filteredTrack.map(p => p.longitude), ...geoInc.map(i => i._lng)]
 
   if (allLats.length === 0) return null
 
@@ -748,7 +769,7 @@ function PitchMapSection({ filteredTrack, incidents, matchVenue, homeTeam, homeC
               strokeLinejoin="round" strokeLinecap="round" />
           ))}
           {geoInc.map(i => {
-            const { x, y } = mapPoint(i.latitude, i.longitude)
+            const { x, y } = mapPoint(i._lat, i._lng)
             return (
               <circle key={i.id} cx={x} cy={y} r="2.4"
                 fill={incidentDotColor(i, teamColour)} stroke="white" strokeWidth="0.45" opacity="0.93"
