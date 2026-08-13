@@ -597,6 +597,16 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
                         matchStorage.markSynced(match.id, pbId)
                         _savedMatches.value = matchStorage.loadMatches()
                         anySuccess = true
+                        // Retry patchSetupStatus independently — a failed status patch
+                        // must not silently prevent the fixture from leaving the pending list.
+                        match.matchSetupId?.let { setupId ->
+                            for (patchAttempt in 1..5) {
+                                val ok = pocketBaseSync.patchSetupStatus(setupId, match.status)
+                                if (ok) break
+                                if (patchAttempt < 5) delay(5_000L)
+                                else Log.w("MatchViewModel", "syncUnsyncedMatches: patchSetupStatus exhausted retries for $setupId")
+                            }
+                        }
                     } else {
                         Log.w("MatchViewModel", "syncUnsyncedMatches: match ${match.id} not synced — will retry")
                         anyFailed = true
@@ -627,8 +637,10 @@ class MatchViewModel(application: Application) : AndroidViewModel(application) {
                 Log.w("MatchViewModel", "refreshPendingSetup: fetch failed, keeping existing list")
             }
         }
-        // Always filter against local history — covers airplane mode and fetch failures
-        val playedSetupIds = _savedMatches.value.mapNotNull { it.matchSetupId }.toSet()
+        // Always filter against local history — covers airplane mode and fetch failures.
+        // Include in-progress match's setup ID so it doesn't reappear in the list mid-match.
+        val playedSetupIds = (_savedMatches.value.mapNotNull { it.matchSetupId } +
+            listOfNotNull(_state.value.matchSetupId)).toSet()
         val before = _pendingSetups.value.size
         _pendingSetups.value = _pendingSetups.value.filter { it.id !in playedSetupIds }
         Log.d("MatchViewModel", "refreshPendingSetup: $before → ${_pendingSetups.value.size} after filtering played")

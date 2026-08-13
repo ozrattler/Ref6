@@ -211,11 +211,6 @@ class PocketBaseSync(private val context: Context) {
                 }
             }
 
-            // Only now that sync succeeded, mark the originating setup as done.
-            match.matchSetupId?.let { setupId ->
-                patchSetupStatus(setupId, match.status)
-            }
-
             Log.i(TAG, "syncMatch: DONE id=$pbMatchId")
             pbMatchId
         } catch (e: Exception) {
@@ -224,10 +219,11 @@ class PocketBaseSync(private val context: Context) {
         }
     }
 
-    private fun patchSetupStatus(id: String, status: String) {
+    // Returns true if the server accepted the patch (HTTP 2xx), false on any failure.
+    internal fun patchSetupStatus(id: String, status: String): Boolean {
         val url = "$baseUrl/match_setups/records/$id"
         Log.i(TAG, "patchSetupStatus: PATCH $url → status=$status")
-        try {
+        return try {
             val conn = URL(url).openConnection() as HttpURLConnection
             conn.requestMethod = "PATCH"
             conn.setRequestProperty("Content-Type", "application/json")
@@ -241,12 +237,16 @@ class PocketBaseSync(private val context: Context) {
             if (code !in 200..299) {
                 val errBody = conn.errorStream?.bufferedReader()?.readText()
                 Log.e(TAG, "patchSetupStatus: HTTP $code body=$errBody")
+                conn.disconnect()
+                false
             } else {
                 Log.i(TAG, "patchSetupStatus: HTTP $code OK")
+                conn.disconnect()
+                true
             }
-            conn.disconnect()
         } catch (e: Exception) {
             Log.e(TAG, "patchSetupStatus: EXCEPTION ${e.javaClass.simpleName}: ${e.message}", e)
+            false
         }
     }
 

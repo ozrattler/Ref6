@@ -247,7 +247,7 @@ class MatchStorage(context: Context) {
     }
 
     companion object {
-        private const val MAX_MATCHES = 5
+        private const val MAX_MATCHES = 50
         const val SCHEMA_VERSION = 3  // bump whenever serialised fields change
 
         fun buildGpsTrackJson(state: MatchState): String {
