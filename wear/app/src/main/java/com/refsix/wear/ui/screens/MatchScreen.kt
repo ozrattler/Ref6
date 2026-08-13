@@ -242,7 +242,7 @@ private fun MainMatchPage(
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(2.dp),
-            modifier = Modifier.padding(horizontal = 8.dp)
+            modifier = Modifier.padding(start = 8.dp, end = 8.dp, bottom = 40.dp)
         ) {
             Text(
                 text = when (state.phase) {
@@ -291,20 +291,45 @@ private fun MainMatchPage(
                 )
             }
 
-            Text(
-                text = "${state.homeScore}  –  ${state.awayScore}",
-                fontSize = 26.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-            )
-
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
+                horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                KitTeamLabel(state.homeTeam.take(4), state.homeColour)
-                KitTeamLabel(state.awayTeam.take(4), state.awayColour)
+                Text(
+                    text = state.homeTeam,
+                    fontSize = 11.sp,
+                    color = Color.LightGray,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.End,
+                    modifier = Modifier.weight(1f)
+                )
+                val homeKit = state.homeColour.toKitColor()
+                if (homeKit != null) {
+                    Spacer(Modifier.width(4.dp))
+                    Box(Modifier.size(8.dp).clip(CircleShape).background(homeKit))
+                }
+                Text(
+                    text = "  ${state.homeScore}  –  ${state.awayScore}  ",
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                val awayKit = state.awayColour.toKitColor()
+                if (awayKit != null) {
+                    Box(Modifier.size(8.dp).clip(CircleShape).background(awayKit))
+                    Spacer(Modifier.width(4.dp))
+                }
+                Text(
+                    text = state.awayTeam,
+                    fontSize = 11.sp,
+                    color = Color.LightGray,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Start,
+                    modifier = Modifier.weight(1f)
+                )
             }
 
             // Sin bins: home on left, away on right — tap to manage
